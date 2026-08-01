@@ -1,51 +1,36 @@
-import { Simulator } from "./constants/Simulators";
-import { getSimAdapter } from "./simulator/api";
+import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 
-export const SIMULATOR = Simulator.MSFS_2024;
-const SimulatorAdapter = getSimAdapter(SIMULATOR);
+const simulator = new MsfsSimulator();
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
 
-  await SimulatorAdapter.Connector.connect();
+  await simulator.connect();
 
-  console.log(
-    `Connected to ${SimulatorAdapter.Connector.getAppName()}. Reading user-aircraft telemetry`,
-  );
+  console.log("Connected. Reading user-aircraft telemetry");
 
-  SimulatorAdapter.AircraftState.setupListeners();
-
-  SimulatorAdapter.AircraftState.onAircraftStateUpdate((received: any) => {
-    const data = received.data;
-    const latitude = data.readFloat64();
-    const longitude = data.readFloat64();
-    const altitudeFeet = data.readFloat64();
-    const trueHeading = data.readFloat64();
-    const groundSpeed = data.readFloat64();
-    const pitch = data.readFloat64();
-    const bank = data.readFloat64();
-    const isOnGround = data.readInt32() !== 0;
-
+  simulator.onAircraftStateUpdate((state) => {
     process.stdout.write(
-      `\rLat ${latitude.toFixed(5)}  Lon ${longitude.toFixed(5)} | ` +
-        `Alt ${altitudeFeet.toFixed(0)} ft  GS ${groundSpeed.toFixed(1)} kt | ` +
-        `HDG ${trueHeading.toFixed(1)}  Pitch ${pitch.toFixed(1)} | ` +
-        `Bank ${bank.toFixed(1)}  Ground: ${isOnGround ? "yes" : "no"}`,
+      `\rLat ${state.latitude.toFixed(5)}  Lon ${state.longitude.toFixed(5)} | ` +
+        `Alt ${state.altitudeFeet.toFixed(0)} ft  GS ${state.groundSpeed.toFixed(1)} kt | ` +
+        `HDG ${state.trueHeading.toFixed(1)}  Pitch ${state.pitch.toFixed(1)} | ` +
+        `Bank ${state.bank.toFixed(1)}  Ground: ${state.isOnGround ? "yes" : "no"}`,
     );
   });
 
-  process.once("SIGINT", async () => {
+  const stop = (): void => {
     console.log("\nDisconnecting");
-    await SimulatorAdapter.Connector.disconnect();
-  });
 
-  process.once("SIGTERM", async () => {
-    console.log("\nDisconnecting");
-    await SimulatorAdapter.Connector.disconnect();
-  });
+    simulator.disconnect();
+    process.exit(0);
+  };
+
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
 }
 
 start().catch((error: unknown) => {
   console.error("Unable to connect to Microsoft Flight Simulator:", error);
+
   process.exitCode = 1;
 });
