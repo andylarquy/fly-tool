@@ -40,9 +40,9 @@ async function start(): Promise<void> {
         const isOnGround = data.readInt32() !== 0;
 
         process.stdout.write(
-            `\rLat ${latitude.toFixed(5)}  Lon ${longitude.toFixed(5)}` +
-                `Alt ${altitudeFeet.toFixed(0)} ft  GS ${groundSpeed.toFixed(1)} kt` +
-                `HDG ${trueHeading.toFixed(1)}  Pitch ${pitch.toFixed(1)}` +
+            `\rLat ${latitude.toFixed(5)}  Lon ${longitude.toFixed(5)} | ` +
+                `Alt ${altitudeFeet.toFixed(0)} ft  GS ${groundSpeed.toFixed(1)} kt | ` +
+                `HDG ${trueHeading.toFixed(1)}  Pitch ${pitch.toFixed(1)} | ` +
                 `Bank ${bank.toFixed(1)}  Ground: ${isOnGround ? 'yes' : 'no'}`,
         );
     });
@@ -59,7 +59,7 @@ async function start(): Promise<void> {
     );
 
     const stop = (): void => {
-        console.log('\nDisconnecting�');
+        console.log('\nDisconnecting');
         handle.close();
         process.exit(0);
     };
