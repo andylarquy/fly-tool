@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "IPjAtN8PAnc=",
+  "success": true,
+  "projectFilePath": "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\FlyTool.Msfs2024.Telemetry.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Andres\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\Andres\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    Copy this file to SimConnect.Local.props and replace the path below with
+    the full path to the managed SimConnect assembly from your MSFS 2024 SDK.
+  -->
+  <PropertyGroup>
+    <SimConnectAssemblyPath>C:\replace\this\with\your\MSFS SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</SimConnectAssemblyPath>
+  </PropertyGroup>
+</Project>

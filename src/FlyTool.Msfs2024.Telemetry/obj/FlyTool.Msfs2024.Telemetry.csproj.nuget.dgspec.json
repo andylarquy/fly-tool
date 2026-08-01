@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "restore": {
+    "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\FlyTool.Msfs2024.Telemetry.csproj": {}
+  },
+  "projects": {
+    "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\FlyTool.Msfs2024.Telemetry.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\FlyTool.Msfs2024.Telemetry.csproj",
+        "projectName": "FlyTool.Msfs2024.Telemetry",
+        "projectPath": "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\FlyTool.Msfs2024.Telemetry.csproj",
+        "packagesPath": "C:\\Users\\Andres\\.nuget\\packages\\",
+        "outputPath": "F:\\boludeces\\fly-tool\\src\\FlyTool.Msfs2024.Telemetry\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Andres\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            },
+            "Microsoft.NETFramework.ReferenceAssemblies.net48": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.416\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win7-x86": {
+          "#import": []
+        }
+      }
+    }
+  }
+}
