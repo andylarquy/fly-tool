@@ -1,2 +1,6 @@
-# Each developer's local MSFS SDK installation path.
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Kept locally in case the previous C# setup needs to be referenced.
 SimConnect.Local.props
