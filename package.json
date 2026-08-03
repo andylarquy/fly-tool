@@ -13,7 +13,8 @@
     "dev": "npm run build && npm start"
   },
   "dependencies": {
-    "node-simconnect": "^4.2.0"
+    "node-simconnect": "^4.2.0",
+    "ollama": "^0.6.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
