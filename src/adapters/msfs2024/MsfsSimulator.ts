@@ -53,6 +53,7 @@ export class MsfsSimulator implements SimulatorAdapter {
         groundSpeed: data.readFloat64(),
         pitch: data.readFloat64(),
         bank: data.readFloat64(),
+        verticalSpeedFeetPerMinute: data.readFloat64(),
         isOnGround: data.readInt32() !== 0,
       };
 
@@ -116,6 +117,13 @@ export class MsfsSimulator implements SimulatorAdapter {
       AIRCRAFT_STATE_DEFINITION_ID,
       "PLANE BANK DEGREES",
       "degrees",
+      SimConnectDataType.FLOAT64,
+    );
+
+    handle.addToDataDefinition(
+      AIRCRAFT_STATE_DEFINITION_ID,
+      "VERTICAL SPEED",
+      "feet per minute",
       SimConnectDataType.FLOAT64,
     );
 

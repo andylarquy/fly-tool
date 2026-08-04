@@ -6,5 +6,6 @@ export interface AircraftState {
   groundSpeed: number;
   pitch: number;
   bank: number;
+  verticalSpeedFeetPerMinute: number;
   isOnGround: boolean;
 }

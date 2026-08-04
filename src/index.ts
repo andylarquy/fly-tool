@@ -3,7 +3,7 @@ import { getAiResponse } from "./ai/ai";
 
 const simulator = new MsfsSimulator();
 
-var flag = 0;
+var hasRequestedAiResponse = false;
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
@@ -13,22 +13,12 @@ async function start(): Promise<void> {
   console.log("Connected. Reading user-aircraft telemetry");
 
   simulator.onAircraftStateUpdate(async (state) => {
-    if (flag === 1) {
-     return;
-    }
-
-    flag = 1;
-
-    const telemetry =
-      `\rLat ${state.latitude.toFixed(5)}  Lon ${state.longitude.toFixed(5)} | ` +
-      `Alt ${state.altitudeFeet.toFixed(0)} ft  GS ${state.groundSpeed.toFixed(1)} kt | ` +
-      `HDG ${state.trueHeading.toFixed(1)}  Pitch ${state.pitch.toFixed(1)} | ` +
-      `Bank ${state.bank.toFixed(1)}  Ground: ${state.isOnGround ? "yes" : "no"}`;
+    if (hasRequestedAiResponse) return;
+    hasRequestedAiResponse = true;
 
     // process.stdout.write(telemetry);
-    console.log(telemetry);
     console.log("Getting response...");
-    const response = await getAiResponse(telemetry);
+    const response = await getAiResponse(state);
     console.log(response);
     stop();
   });
