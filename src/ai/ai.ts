@@ -1,56 +1,57 @@
-import ollama from "ollama";
+import ollama, { Message } from "ollama";
 import { AircraftState } from "../domain/AircraftState";
+import { AI_SYSTEM_PROMPT } from "./aiConfig"
 
-export const getAiResponse = async (state: AircraftState) => {
-  const content = `
-Aircraft state:
-Latitude: ${state.latitude}
-Longitude: ${state.longitude}
-Altitude: ${state.altitudeFeet} ft
-Ground speed: ${state.groundSpeed} kt
-Heading: ${state.trueHeading} degrees
-Pitch: ${state.pitch} degrees
-Bank: ${state.bank} degrees
-Vertical Speed: ${state.verticalSpeedFeetPerMinute} ft/m
-On ground: ${state.isOnGround}
+const conversationHistory: Message[] = [];
+
+export const getAiResponse = async (
+  state: AircraftState,
+  pilotTransmission: string,
+) => {
+  const transmissionContent = `
+PILOT TRANSMISSION
+${pilotTransmission}
 `;
 
+  const content = `
+CURRENT AIRCRAFT STATE
+This information comes directly from the simulator and is authoritative.
+
+Callsign: LV-INQ
+Latitude: ${state.latitude}
+Longitude: ${state.longitude}
+Altitude: ${Math.round(state.altitudeFeet)} ft
+Ground speed: ${Math.round(state.groundSpeed)} kt
+Heading: ${Math.round(state.trueHeading)} degrees
+Pitch: ${state.pitch} degrees
+Bank: ${state.bank} degrees
+Vertical Speed: ${Math.round(state.verticalSpeedFeetPerMinute)} ft/min
+On ground: ${state.isOnGround}
+${transmissionContent}`;
+
   console.log(content);
+
+  // Sent to the model this turn only: fresh telemetry + the transmission.
+  const userMessage: Message = { role: "user", content };
+
+  // Stored in history: the transmission alone, so past telemetry snapshots
+  // don't accumulate in the context window.
+  const historyUserMessage: Message = {
+    role: "user",
+    content: transmissionContent,
+  };
 
   const response = await ollama.chat({
     model: "qwen3:8b",
     messages: [
-      {
-        role: "system",
-        content: `
-You are an assistant which has to help understand the context of the telemetry data of an airplane.
-You will receive all the raw data, and you will respond the heading, the altitude, and some short summary of what the airplane is doing.
-For example:
-You recieve as an input: 
-
-\`Aircraft state:
-Latitude: x
-Longitude: y
-Altitude: 3000 ft
-Ground speed: 100 kt
-Heading: 180 degrees
-Pitch: 2 degrees
-Bank: 20 degrees
-Vertical Speed: -100 ft/m
-On ground: no\`
-
-Then your answer is: "You're flying at 3000ft heading 180, the airplane is turning to the right"
-
-Do not explain your reasoning.
-      `,
-      },
-      {
-        role: "user",
-        content,
-      },
+      { role: "system", content: AI_SYSTEM_PROMPT },
+      ...conversationHistory,
+      userMessage,
     ],
     think: false,
   });
+
+  conversationHistory.push(historyUserMessage, response.message);
 
   return response.message.content;
 };

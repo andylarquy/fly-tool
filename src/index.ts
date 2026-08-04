@@ -1,9 +1,11 @@
+import * as readline from "node:readline";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 import { getAiResponse } from "./ai/ai";
+import { AircraftState } from "./domain/AircraftState";
 
 const simulator = new MsfsSimulator();
 
-var hasRequestedAiResponse = false;
+let latestAircraftState: AircraftState | null = null;
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
@@ -12,26 +14,48 @@ async function start(): Promise<void> {
 
   console.log("Connected. Reading user-aircraft telemetry");
 
-  simulator.onAircraftStateUpdate(async (state) => {
-    if (hasRequestedAiResponse) return;
-    hasRequestedAiResponse = true;
+  simulator.onAircraftStateUpdate((state) => {
+    latestAircraftState = state;
+  });
 
-    // process.stdout.write(telemetry);
-    console.log("Getting response...");
-    const response = await getAiResponse(state);
-    console.log(response);
-    stop();
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "Pilot> ",
   });
 
   const stop = (): void => {
     console.log("\nDisconnecting");
 
+    rl.close();
     simulator.disconnect();
     process.exit(0);
   };
 
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+
+  console.log("Type a pilot transmission and press Enter to send it to ATC.");
+  rl.prompt();
+
+  rl.on("line", async (line) => {
+    const transmission = line.trim();
+
+    if (!transmission) {
+      rl.prompt();
+      return;
+    }
+
+    if (!latestAircraftState) {
+      console.log("No telemetry received yet, try again shortly.");
+      rl.prompt();
+      return;
+    }
+
+    const response = await getAiResponse(latestAircraftState, transmission);
+    console.log(response);
+    rl.prompt();
+  });
 }
 
 start().catch((error: unknown) => {
