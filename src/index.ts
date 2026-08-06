@@ -2,10 +2,13 @@ import * as readline from "node:readline";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 import { getAiResponse } from "./ai/ai";
 import { AircraftState } from "./domain/AircraftState";
+import { formatTimestamp } from "./utils/timeFormatting"
 
 const simulator = new MsfsSimulator();
 
 let latestAircraftState: AircraftState | null = null;
+
+
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
@@ -53,7 +56,7 @@ async function start(): Promise<void> {
     }
 
     const response = await getAiResponse(latestAircraftState, transmission);
-    console.log(response);
+    console.log(`[${formatTimestamp(new Date())}] ${response}`);
     rl.prompt();
   });
 }

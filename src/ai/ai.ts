@@ -1,6 +1,7 @@
 import ollama, { Message } from "ollama";
 import { AircraftState } from "../domain/AircraftState";
 import { AI_SYSTEM_PROMPT } from "./aiConfig"
+import { formatTimestamp } from "../utils/timeFormatting"
 
 const conversationHistory: Message[] = [];
 
@@ -29,7 +30,7 @@ Vertical Speed: ${Math.round(state.verticalSpeedFeetPerMinute)} ft/min
 On ground: ${state.isOnGround}
 ${transmissionContent}`;
 
-  console.log(content);
+  console.log(`${content}\n[${formatTimestamp(new Date())}]`);
 
   // Sent to the model this turn only: fresh telemetry + the transmission.
   const userMessage: Message = { role: "user", content };
@@ -48,10 +49,15 @@ ${transmissionContent}`;
       ...conversationHistory,
       userMessage,
     ],
-    think: false,
+    think: true,
   });
 
-  conversationHistory.push(historyUserMessage, response.message);
+  const historyAssistantMessage: Message = {
+    role: "assistant",
+    content: response.message.content,
+  };
+
+  conversationHistory.push(historyUserMessage, historyAssistantMessage);
 
   return response.message.content;
 };
