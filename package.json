@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
-    "dev": "npm run build && npm start"
+    "dev": "npm run build && npm start",
+    "lab": "npm run build && node dist/lab/lab.js"
   },
   "dependencies": {
     "node-simconnect": "^4.2.0",

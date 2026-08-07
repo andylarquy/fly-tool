@@ -2,6 +2,7 @@ import ollama, { Message } from "ollama";
 import { AircraftState } from "../domain/AircraftState";
 import { AI_SYSTEM_PROMPT } from "./aiConfig"
 import { formatTimestamp } from "../utils/timeFormatting"
+import { MODEL, parseModelContent } from "./modelConfig"
 
 const conversationHistory: Message[] = [];
 
@@ -32,32 +33,47 @@ ${transmissionContent}`;
 
   console.log(`${content}\n[${formatTimestamp(new Date())}]`);
 
-  // Sent to the model this turn only: fresh telemetry + the transmission.
   const userMessage: Message = { role: "user", content };
 
-  // Stored in history: the transmission alone, so past telemetry snapshots
-  // don't accumulate in the context window.
   const historyUserMessage: Message = {
     role: "user",
     content: transmissionContent,
   };
 
+  const start = performance.now();
+
   const response = await ollama.chat({
-    model: "qwen3:8b",
+    model: MODEL,
     messages: [
       { role: "system", content: AI_SYSTEM_PROMPT },
       ...conversationHistory,
       userMessage,
     ],
-    think: true,
+    think: "low",
+  });
+
+  const end = performance.now();
+
+  const answer = parseModelContent(response.message.content);
+
+  console.log(`Inference took ${(end - start).toFixed(0)} ms`);
+  console.log({
+    total: response.total_duration,
+    load: response.load_duration,
+    promptEval: response.prompt_eval_duration,
+    eval: response.eval_duration,
+    promptTokens: response.prompt_eval_count,
+    generatedTokens: response.eval_count,
+    thinkingChars: response.message.thinking?.length ?? 0,
+    contentChars: answer.length,
   });
 
   const historyAssistantMessage: Message = {
     role: "assistant",
-    content: response.message.content,
+    content: answer,
   };
 
   conversationHistory.push(historyUserMessage, historyAssistantMessage);
 
-  return response.message.content;
+  return answer;
 };
