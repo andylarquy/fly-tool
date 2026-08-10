@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+benchmark-results/
 
 # Kept locally in case the previous C# setup needs to be referenced.
 SimConnect.Local.props

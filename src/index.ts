@@ -1,6 +1,7 @@
 import * as readline from "node:readline";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 import { getAiResponse } from "./ai/ai";
+import { formatInferenceStats } from "./ai/inferenceStats";
 import { AircraftState } from "./domain/AircraftState";
 import { formatTimestamp } from "./utils/timeFormatting";
 
@@ -56,12 +57,15 @@ async function start(): Promise<void> {
     // TODO: Eventually implement a proper ATC context once the lab research ends
     const latestAtcState = { situationContext: "" };
 
-    const response = await getAiResponse(
+    const { content, thinking, response } = await getAiResponse(
       latestAircraftState,
       latestAtcState,
       transmission,
     );
-    console.log(response);
+
+    console.log(`\nThinking:\n${thinking}\n`);
+    console.log(`\n${formatInferenceStats(response)}\n`);
+    console.log(`[${formatTimestamp(new Date())}] ${content}`);
     rl.prompt();
   });
 }

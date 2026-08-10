@@ -1,5 +1,6 @@
 import * as readline from "node:readline";
 import { getAiResponse } from "../ai/ai";
+import { formatInferenceStats } from "../ai/inferenceStats";
 import { formatTimestamp } from "../utils/timeFormatting";
 import { cases, LabCase } from "./cases";
 
@@ -53,8 +54,15 @@ async function start(): Promise<void> {
 
     const testCase = await selectCase();
 
-    const response = await getAiResponse(testCase.aircraftState,testCase.atcState, transmission);
-    console.log(`\n[${formatTimestamp(new Date())}] ${response}`);
+    const { content, thinking, response } = await getAiResponse(
+      testCase.aircraftState,
+      testCase.atcState,
+      transmission,
+    );
+
+    console.log(`\nThinking:\n${thinking}\n`);
+    console.log(`\n${formatInferenceStats(response)}\n`);
+    console.log(`\n[${formatTimestamp(new Date())}] ${content}`);
   }
 }
 

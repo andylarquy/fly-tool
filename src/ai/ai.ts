@@ -1,9 +1,8 @@
-import ollama, { Message } from "ollama";
+import ollama, { ChatResponse, Message } from "ollama";
 import { AircraftState } from "../domain/AircraftState";
 import { AI_SYSTEM_PROMPT } from "./aiConfig";
-import { MODEL, parseModelContent } from "./modelConfig";
+import { MODEL, THINKING, parseModelContent } from "./modelConfig";
 import { AtcState } from "../domain/AtcState";
-import { formatInferenceStats } from "./inferenceStats";
 import { KNOWLEDGE_BASE } from "./knowledgeBase";
 
 const SYSTEM_PROMPT = [
@@ -14,15 +13,34 @@ const SYSTEM_PROMPT = [
 
 const conversationHistory: Message[] = [];
 
+const formatPilotTransmission = (pilotTransmission: string): string => `
+PILOT TRANSMISSION
+${pilotTransmission}
+`;
+
+export const resetConversation = (): void => {
+  conversationHistory.length = 0;
+};
+
+export const seedConversationTurn = (pilot: string, atc: string): void => {
+  conversationHistory.push(
+    { role: "user", content: formatPilotTransmission(pilot) },
+    { role: "assistant", content: atc },
+  );
+};
+
+export interface AiResponse {
+  content: string;
+  thinking: string;
+  response: ChatResponse;
+}
+
 export const getAiResponse = async (
   aircraftSate: AircraftState,
   atcState: AtcState,
   pilotTransmission: string,
-) => {
-  const transmissionContent = `
-PILOT TRANSMISSION
-${pilotTransmission}
-`;
+): Promise<AiResponse> => {
+  const transmissionContent = formatPilotTransmission(pilotTransmission);
 
   const content = `
 CURRENT AIRCRAFT STATE
@@ -57,15 +75,12 @@ ${atcState.situationContext}`;
       ...conversationHistory,
       userMessage,
     ],
-    think: "low",
+    think: THINKING,
   });
 
   const { content: answer, thinking } = parseModelContent(
     response.message.content,
   );
-
-  console.log(`\nThinking:\n${thinking || response.message.thinking || ""}\n`);
-  console.log(`\n${formatInferenceStats(response)}\n`);
 
   const historyAssistantMessage: Message = {
     role: "assistant",
@@ -74,5 +89,9 @@ ${atcState.situationContext}`;
 
   conversationHistory.push(historyUserMessage, historyAssistantMessage);
 
-  return answer;
+  return {
+    content: answer,
+    thinking: thinking || response.message.thinking || "",
+    response,
+  };
 };
