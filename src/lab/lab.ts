@@ -52,7 +52,7 @@ async function start(): Promise<void> {
 
     const testCase = await selectCase();
 
-    const response = await getAiResponse(testCase.state, transmission);
+    const response = await getAiResponse(testCase.aircraftState,testCase.atcState, transmission);
     console.log(`[${formatTimestamp(new Date())}] ${response}`);
   }
 }

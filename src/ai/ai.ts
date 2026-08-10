@@ -3,11 +3,13 @@ import { AircraftState } from "../domain/AircraftState";
 import { AI_SYSTEM_PROMPT } from "./aiConfig"
 import { formatTimestamp } from "../utils/timeFormatting"
 import { MODEL, parseModelContent } from "./modelConfig"
+import { AtcState } from "../domain/AtcState"
 
 const conversationHistory: Message[] = [];
 
 export const getAiResponse = async (
-  state: AircraftState,
+  aircraftSate: AircraftState,
+  atcState: AtcState,
   pilotTransmission: string,
 ) => {
   const transmissionContent = `
@@ -20,16 +22,19 @@ CURRENT AIRCRAFT STATE
 This information comes directly from the simulator and is authoritative.
 
 Callsign: LV-INQ
-Latitude: ${state.latitude}
-Longitude: ${state.longitude}
-Altitude: ${Math.round(state.altitudeFeet)} ft
-Ground speed: ${Math.round(state.groundSpeed)} kt
-Heading: ${Math.round(state.trueHeading)} degrees
-Pitch: ${state.pitch} degrees
-Bank: ${state.bank} degrees
-Vertical Speed: ${Math.round(state.verticalSpeedFeetPerMinute)} ft/min
-On ground: ${state.isOnGround}
-${transmissionContent}`;
+Latitude: ${aircraftSate.latitude}
+Longitude: ${aircraftSate.longitude}
+Altitude: ${Math.round(aircraftSate.altitudeFeet)} ft
+Ground speed: ${Math.round(aircraftSate.groundSpeed)} kt
+Heading: ${Math.round(aircraftSate.trueHeading)} degrees
+Pitch: ${aircraftSate.pitch} degrees
+Bank: ${aircraftSate.bank} degrees
+Vertical Speed: ${Math.round(aircraftSate.verticalSpeedFeetPerMinute)} ft/min
+On ground: ${aircraftSate.isOnGround}
+${transmissionContent}
+
+SITUATION CONTEXT
+${atcState.situationContext}`;
 
   console.log(`${content}\n[${formatTimestamp(new Date())}]`);
 
