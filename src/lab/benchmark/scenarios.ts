@@ -1,11 +1,17 @@
 import { AircraftState } from "../../domain/AircraftState";
 import { BenchmarkScenario, ConversationTurn } from "./benchmarkTypes";
 
-const ACTIVE_RUNWAY_CONTEXT =
-  "Active runway is 23.\nPilot intention is performing a traffic pattern for runway 23.";
+/*
+ * ---------------------------------------------------------------------------
+ * Shared aircraft states
+ * ---------------------------------------------------------------------------
+ *
+ * These are deliberately simple and internally consistent.
+ *
+ * The benchmark is testing ATC reasoning, not navigation/geometric accuracy,
+ * so we don't need dozens of unique telemetry samples yet.
+ */
 
-// Same telemetry on purpose: the distinction between holding short and
-// lined up is carried by situation context, not the numbers alone.
 const holdingShort: AircraftState = {
   latitude: -34.450169564238806,
   longitude: -58.585754419918246,
@@ -22,394 +28,650 @@ const linedUp: AircraftState = {
   latitude: -34.450169564238806,
   longitude: -58.585754419918246,
   altitudeFeet: 13,
-  trueHeading: 230,
+  trueHeading: 224,
   groundSpeed: 0,
-  pitch: 0,
-  bank: 0,
+  pitch: -0.13830090636339298,
+  bank: -0.16137975025545245,
   verticalSpeedFeetPerMinute: 0,
   isOnGround: true,
 };
 
 const initialClimb: AircraftState = {
-  latitude: -34.454,
-  longitude: -58.589,
-  altitudeFeet: 350,
-  trueHeading: 230,
-  groundSpeed: 75,
-  pitch: 8,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 700,
-  isOnGround: false,
-};
-
-const crosswindClimb: AircraftState = {
-  latitude: -34.459,
-  longitude: -58.592,
-  altitudeFeet: 800,
-  trueHeading: 314,
-  groundSpeed: 85,
-  pitch: 5,
-  bank: 20,
-  verticalSpeedFeetPerMinute: 500,
-  isOnGround: false,
-};
-
-const downwindLevel: AircraftState = {
   latitude: -34.466053600241985,
   longitude: -58.60380201309368,
-  altitudeFeet: 1000,
-  trueHeading: 44,
-  groundSpeed: 90,
-  pitch: 0,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 0,
-  isOnGround: false,
-};
-
-const inboundForPatternEntry: AircraftState = {
-  latitude: -34.5,
-  longitude: -58.55,
-  altitudeFeet: 1200,
-  trueHeading: 4,
-  groundSpeed: 100,
-  pitch: 0,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 0,
-  isOnGround: false,
-};
-
-const turningBase: AircraftState = {
-  latitude: -34.456,
-  longitude: -58.6,
-  altitudeFeet: 600,
-  trueHeading: 314,
-  groundSpeed: 80,
-  pitch: -3,
-  bank: -18,
-  verticalSpeedFeetPerMinute: -400,
-  isOnGround: false,
-};
-
-const shortFinal: AircraftState = {
-  latitude: -34.451,
-  longitude: -58.587,
-  altitudeFeet: 300,
-  trueHeading: 230,
-  groundSpeed: 70,
-  pitch: -2,
-  bank: 0,
-  verticalSpeedFeetPerMinute: -450,
-  isOnGround: false,
-};
-
-const veryShortFinal: AircraftState = {
-  latitude: -34.4505,
-  longitude: -58.5862,
-  altitudeFeet: 50,
-  trueHeading: 230,
-  groundSpeed: 65,
-  pitch: -1,
-  bank: 0,
-  verticalSpeedFeetPerMinute: -300,
-  isOnGround: false,
-};
-
-const climbingThrough700: AircraftState = {
-  latitude: -34.466053600241985,
-  longitude: -58.60380201309368,
-  altitudeFeet: 700,
+  altitudeFeet: 694,
   trueHeading: 223,
-  groundSpeed: 80,
-  pitch: 6,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 650,
+  groundSpeed: 60,
+  pitch: -7.184934695847636,
+  bank: 1.4493565442989484,
+  verticalSpeedFeetPerMinute: 789,
   isOnGround: false,
 };
 
-const inboundForLanding: AircraftState = {
-  latitude: -34.55,
-  longitude: -58.52,
-  altitudeFeet: 1500,
-  trueHeading: 220,
-  groundSpeed: 100,
-  pitch: 0,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 0,
+const downwind: AircraftState = {
+  latitude: -34.44601906163748,
+  longitude: -58.56284715153178,
+  altitudeFeet: 1056,
+  trueHeading: 323,
+  groundSpeed: 75,
+  pitch: 1.1911054611925342,
+  bank: -1.367722324568578,
+  verticalSpeedFeetPerMinute: -98,
   isOnGround: false,
 };
 
-const goAroundClimb: AircraftState = {
-  latitude: -34.4508,
-  longitude: -58.5865,
-  altitudeFeet: 60,
-  trueHeading: 230,
-  groundSpeed: 70,
-  pitch: 10,
-  bank: 0,
-  verticalSpeedFeetPerMinute: 600,
-  isOnGround: false,
-};
+/*
+ * ---------------------------------------------------------------------------
+ * Shared situation contexts
+ * ---------------------------------------------------------------------------
+ */
 
-const readyForDepartureHoldingShort: ConversationTurn[] = [
+const takeoffContext = `
+Active runway is 23.
+Aircraft is operating in the left-hand traffic pattern for runway 23.
+Aircraft is holding short of runway 23 and is ready for departure.
+`.trim();
+
+const linedUpContext = `
+Active runway is 23.
+Aircraft is operating in the left-hand traffic pattern for runway 23.
+Aircraft is lined up on runway 23 and is awaiting takeoff clearance.
+`.trim();
+
+const initialClimbContext = `
+Active runway is 23.
+Aircraft is operating in the left-hand traffic pattern for runway 23.
+Aircraft has departed runway 23 and is currently climbing.
+`.trim();
+
+const downwindContext = `
+Active runway is 23.
+Aircraft is operating in the left-hand traffic pattern for runway 23.
+Aircraft is currently on the downwind leg.
+`.trim();
+
+/*
+ * ---------------------------------------------------------------------------
+ * Shared conversation histories
+ * ---------------------------------------------------------------------------
+ *
+ * These are used only when the scenario genuinely depends on something
+ * previously said by ATC.
+ */
+
+const takeoffClearanceIssued: ConversationTurn[] = [
   {
-    pilot: "Holding short runway 23, ready for departure.",
+    pilot: "Tower, holding short runway 23, ready for departure, LV-INQ.",
     atc: "LV-INQ, cleared for takeoff runway 23.",
   },
 ];
 
-const readyForDepartureLinedUp: ConversationTurn[] = [
+const landingClearanceIssued: ConversationTurn[] = [
   {
-    pilot: "Lined up runway 23, ready for departure.",
-    atc: "LV-INQ, cleared for takeoff runway 23.",
+    pilot: "Tower, final runway 23,  LV-INQ.",
+    atc: "LV-INQ, cleared to land runway 23.",
   },
 ];
 
-const clearedThenReadBackTurns: ConversationTurn[] = [
-  ...readyForDepartureHoldingShort,
+const climbInstructionIssued: ConversationTurn[] = [
   {
-    pilot: "Cleared for takeoff runway 23, LV-INQ.",
-    atc: "[NO RESPONSE]",
+    pilot: "Tower, airborne, initial climb, LV-INQ.",
+    atc: "LV-INQ, maintain runway heading, climb and maintain 1000 feet, report downwind.",
   },
 ];
+
+/*
+ * ---------------------------------------------------------------------------
+ * Benchmark scenarios
+ * ---------------------------------------------------------------------------
+ */
 
 export const scenarios: BenchmarkScenario[] = [
-  // Readbacks
+  /*
+   * ========================================================================
+   * BASIC REQUESTS
+   * ========================================================================
+   */
+
   {
     name: "Request takeoff clearance",
+
     aircraftState: holdingShort,
+
     atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is holding short of runway 23, awaiting takeoff clearance.`,
+      situationContext: takeoffContext,
     },
+
     pilotTransmission:
-      "Tower, LV-INQ, holding short runway 23, ready for departure.",
+      "Tower, holding short runway 23, ready for departure,  LV-INQ.",
+
     expectations: {
       responseRequired: true,
       requiredConcepts: ["cleared for takeoff", "23"],
+      forbiddenPatterns: ["cleared to land"],
     },
   },
+
+  {
+    name: "Lined up and requesting takeoff clearance",
+
+    aircraftState: linedUp,
+
+    atcState: {
+      situationContext: linedUpContext,
+    },
+
+    pilotTransmission:
+      "Tower, lined up runway 23, ready for departure, LV-INQ.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["cleared for takeoff", "23"],
+      forbiddenPatterns: ["taxi to", "hold short"],
+    },
+  },
+
+  {
+    name: "Request traffic pattern entry",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is approaching the airport from the south.
+        Aircraft is not yet established in the traffic pattern.
+        Standard traffic pattern is left-hand.
+        Pattern altitude is 1000 feet.
+      `.trim(),
+    },
+
+    pilotTransmission:
+      "Tower, five miles south, request pattern entry runway 23, LV-INQ.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["23"],
+      forbiddenPatterns: ["cleared to land"],
+    },
+  },
+
+  /*
+   * ========================================================================
+   * READBACKS
+   * ========================================================================
+   */
+
   {
     name: "Correct takeoff readback",
+
     aircraftState: holdingShort,
-    atcState: { situationContext: ACTIVE_RUNWAY_CONTEXT },
-    initialConversation: readyForDepartureHoldingShort,
+
+    atcState: {
+      situationContext: takeoffContext,
+    },
+
+    initialConversation: takeoffClearanceIssued,
+
     pilotTransmission: "Cleared for takeoff runway 23, LV-INQ.",
+
     expectations: {
       responseRequired: false,
-      forbiddenPatterns: ["cleared for takeoff"],
     },
   },
+
   {
     name: "Paraphrased takeoff readback",
+
     aircraftState: holdingShort,
-    atcState: { situationContext: ACTIVE_RUNWAY_CONTEXT },
-    initialConversation: readyForDepartureHoldingShort,
-    pilotTransmission: "Roger, we're cleared for takeoff on 23, LV-INQ.",
+
+    atcState: {
+      situationContext: takeoffContext,
+    },
+
+    initialConversation: takeoffClearanceIssued,
+
+    pilotTransmission: "Roger, we're cleared for takeoff on runway 23, LV-INQ.",
+
     expectations: {
       responseRequired: false,
-      forbiddenPatterns: ["cleared for takeoff"],
     },
   },
+
+  {
+    name: "Wilco takeoff readback",
+
+    aircraftState: holdingShort,
+
+    atcState: {
+      situationContext: takeoffContext,
+    },
+
+    initialConversation: takeoffClearanceIssued,
+
+    pilotTransmission: "Wilco, cleared for takeoff runway 23, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+    },
+  },
+
   {
     name: "Incorrect runway readback",
+
     aircraftState: holdingShort,
-    atcState: { situationContext: ACTIVE_RUNWAY_CONTEXT },
-    initialConversation: readyForDepartureHoldingShort,
+
+    atcState: {
+      situationContext: takeoffContext,
+    },
+
+    initialConversation: takeoffClearanceIssued,
+
     pilotTransmission: "Cleared for takeoff runway 05, LV-INQ.",
+
     expectations: {
       responseRequired: true,
       requiredConcepts: ["23"],
-      forbiddenPatterns: ["runway 05"],
+      forbiddenPatterns: ["runway 05", "hold short"],
     },
   },
+
   {
-    name: "Landing-clearance readback",
-    aircraftState: shortFinal,
+    name: "Correct landing clearance readback",
+
+    aircraftState: downwind,
+
     atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is on final approach for runway 23.`,
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established in the traffic pattern.
+        Aircraft has already received landing clearance for runway 23.
+      `.trim(),
     },
+
+    initialConversation: landingClearanceIssued,
+
+    pilotTransmission: "Cleared to land runway 23, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+    },
+  },
+
+  /*
+   * ========================================================================
+   * POSITION REPORTS
+   * ========================================================================
+   *
+   * These test that the model doesn't treat every pilot transmission as
+   * requiring a response.
+   */
+
+  {
+    name: "Report downwind when no action is required",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established on downwind.
+        No additional ATC instruction is currently required.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, downwind, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+    },
+  },
+
+  /*
+   * ========================================================================
+   * STATE CONTINUITY
+   * ========================================================================
+   */
+
+  {
+    name: "Already climbing, do not repeat takeoff clearance",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft has already departed runway 23.
+        Aircraft is currently climbing through approximately 700 feet.
+        Aircraft was previously cleared for takeoff.
+        Aircraft is maintaining runway heading.
+      `.trim(),
+    },
+
     initialConversation: [
       {
-        pilot: "Tower, LV-INQ, on final for runway 23.",
-        atc: "LV-INQ, cleared to land runway 23.",
+        pilot: "Tower, holding short runway 23, ready for departure, LV-INQ.",
+        atc: "LV-INQ, cleared for takeoff runway 23, maintain runway heading, climb and maintain 1000 feet.",
       },
     ],
-    pilotTransmission: "Cleared to land runway 23, LV-INQ.",
+
+    pilotTransmission: "Currently climbing through 700 feet, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+      forbiddenPatterns: ["cleared for takeoff", "takeoff"],
+    },
+  },
+
+  {
+    name: "Completed instruction should not be repeated",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established on downwind at pattern altitude.
+        Aircraft has already completed the previously issued climb instruction.
+      `.trim(),
+    },
+
+    initialConversation: [
+      {
+        pilot: "Tower, climbing through 700 feet, LV-INQ.",
+        atc: "LV-INQ, climb and maintain 1000 feet, report downwind.",
+      },
+    ],
+
+    pilotTransmission: "Downwind at 1000 feet, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+      forbiddenPatterns: ["climb and maintain", "climb to"],
+    },
+  },
+
+  /*
+   * ========================================================================
+   * TRAFFIC PATTERN
+   * ========================================================================
+   */
+
+  {
+    name: "Initial climb instruction",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft has just departed runway 23.
+        Aircraft is climbing on runway heading.
+        Standard traffic pattern is left-hand.
+        Pattern altitude is 1000 feet.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, airborne, initial climb, LV-INQ.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["heading"],
+      forbiddenPatterns: ["cleared to land"],
+    },
+  },
+
+  {
+    name: "Crosswind position report",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft has departed and is turning from the departure leg toward crosswind.
+        Standard traffic pattern is left-hand.
+        Pattern altitude is 1000 feet.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, turning crosswind, LV-INQ.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["1000"],
+      forbiddenPatterns: ["cleared for takeoff", "cleared to land"],
+    },
+  },
+
+  {
+    name: "Downwind position report",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established on left downwind.
+        Aircraft is at approximately pattern altitude.
+        No additional instruction is currently required.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, downwind, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+    },
+  },
+
+  /*
+   * ========================================================================
+   * LANDING
+   * ========================================================================
+   */
+
+  {
+    name: "Final with runway available",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established on final for runway 23.
+        Runway is clear.
+        Aircraft has not yet received landing clearance.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, final runway 23, full stop, LV-INQ.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["cleared to land", "23"],
+      forbiddenPatterns: ["cleared for takeoff"],
+    },
+  },
+
+  {
+    name: "Already cleared to land on short final",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is on short final.
+        Aircraft has already received landing clearance for runway 23.
+        Runway remains clear.
+      `.trim(),
+    },
+
+    initialConversation: landingClearanceIssued,
+
+    pilotTransmission: "Tower, short final, LV-INQ.",
+
     expectations: {
       responseRequired: false,
       forbiddenPatterns: ["cleared to land"],
     },
   },
 
-  // Traffic pattern
-  {
-    name: "Report initial climb",
-    aircraftState: initialClimb,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft departed runway 23 and is climbing on runway heading.\nNo conflicting traffic is known.`,
-    },
-    initialConversation: clearedThenReadBackTurns,
-    pilotTransmission: "Tower, LV-INQ, airborne, climbing runway heading.",
-    expectations: {
-      responseRequired: false,
-    },
-  },
-  {
-    name: "Report crosswind",
-    aircraftState: crosswindClimb,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is climbing and turning onto the crosswind leg.\nNo conflicting traffic is known.`,
-    },
-    initialConversation: clearedThenReadBackTurns,
-    pilotTransmission: "Tower, LV-INQ, turning crosswind.",
-    expectations: {
-      responseRequired: false,
-    },
-  },
-  {
-    name: "Report downwind",
-    aircraftState: downwindLevel,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is established on the downwind leg.\nNo new ATC instruction is required.`,
-    },
-    pilotTransmission: "Tower, LV-INQ, downwind.",
-    expectations: {
-      responseRequired: false,
-    },
-  },
-  {
-    name: "Request pattern entry",
-    aircraftState: inboundForPatternEntry,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is inbound to the field requesting to join the traffic pattern.\nTraffic pattern altitude is 1000 feet.`,
-    },
-    pilotTransmission:
-      "Tower, LV-INQ, 5 miles south, request pattern entry runway 23.",
-    expectations: {
-      responseRequired: true,
-      requiredConcepts: ["23"],
-    },
-  },
-  {
-    name: "Report base",
-    aircraftState: turningBase,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft was previously instructed to report base.\nNo additional traffic information is available.`,
-    },
-    pilotTransmission: "Turning base, LV-INQ.",
-    expectations: {
-      responseRequired: false,
-    },
-  },
-  {
-    name: "Report final",
-    aircraftState: shortFinal,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is number one in the traffic pattern.\nRunway 23 is clear.\nNo conflicting traffic is present.`,
-    },
-    pilotTransmission: "Tower, LV-INQ, final for runway 23, full stop.",
-    expectations: {
-      responseRequired: true,
-      requiredConcepts: ["cleared to land", "23"],
-    },
-  },
+  /*
+   * ========================================================================
+   * GO-AROUND
+   * ========================================================================
+   */
 
-  // Takeoff
-  {
-    name: "Lined up and requesting clearance",
-    aircraftState: linedUp,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is lined up on runway 23, no conflicting traffic.`,
-    },
-    pilotTransmission:
-      "Tower, LV-INQ, lined up runway 23, ready for departure.",
-    expectations: {
-      responseRequired: true,
-      requiredConcepts: ["cleared for takeoff", "23"],
-    },
-  },
-  {
-    name: "Cleared for takeoff, readback",
-    aircraftState: linedUp,
-    atcState: { situationContext: ACTIVE_RUNWAY_CONTEXT },
-    initialConversation: readyForDepartureLinedUp,
-    pilotTransmission: "Wilco, cleared for takeoff runway 23, LV-INQ.",
-    expectations: {
-      responseRequired: false,
-      forbiddenPatterns: ["cleared for takeoff"],
-    },
-  },
-  {
-    name: "Airborne, initial climb",
-    aircraftState: initialClimb,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft just departed runway 23.`,
-    },
-    initialConversation: clearedThenReadBackTurns,
-    pilotTransmission: "Tower, LV-INQ, airborne.",
-    expectations: {
-      responseRequired: false,
-      forbiddenPatterns: ["cleared for takeoff"],
-    },
-  },
-  {
-    name: "Already climbing, don't reissue takeoff clearance",
-    aircraftState: climbingThrough700,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft departed runway 23 and is climbing.`,
-    },
-    initialConversation: clearedThenReadBackTurns,
-    pilotTransmission: "Tower, LV-INQ, currently climbing through 700 feet.",
-    expectations: {
-      responseRequired: false,
-      forbiddenPatterns: ["cleared for takeoff", "line up", "hold short"],
-    },
-  },
-
-  // Landing
-  {
-    name: "Request landing",
-    aircraftState: inboundForLanding,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft is inbound for landing.`,
-    },
-    pilotTransmission:
-      "Tower, LV-INQ, 10 miles north, request full stop landing runway 23.",
-    expectations: {
-      responseRequired: true,
-      requiredConcepts: ["cleared to land", "23"],
-    },
-  },
-  {
-    name: "Report final, already cleared to land",
-    aircraftState: veryShortFinal,
-    atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft was already cleared to land runway 23 and is now on short final.\nNo new ATC instruction is required.`,
-    },
-    pilotTransmission: "Tower, LV-INQ, short final.",
-    expectations: {
-      responseRequired: false,
-    },
-  },
-  {
-    name: "Cleared to land, readback",
-    aircraftState: shortFinal,
-    atcState: { situationContext: ACTIVE_RUNWAY_CONTEXT },
-    pilotTransmission: "Cleared to land runway 23, LV-INQ.",
-    expectations: {
-      responseRequired: false,
-      forbiddenPatterns: ["cleared to land"],
-    },
-  },
   {
     name: "Go-around",
-    aircraftState: goAroundClimb,
+
+    aircraftState: initialClimb,
+
     atcState: {
-      situationContext: `${ACTIVE_RUNWAY_CONTEXT}\nAircraft was on short final for runway 23 and has initiated a go-around.\nThe aircraft should re-enter the traffic pattern.`,
+      situationContext: `
+        Active runway is 23.
+        Aircraft was previously on approach to runway 23.
+        Aircraft is now climbing after initiating a go-around.
+      `.trim(),
     },
-    pilotTransmission: "Tower, LV-INQ, going around.",
+
+    pilotTransmission: "Tower, going around, LV-INQ.",
+
     expectations: {
       responseRequired: true,
+      requiredConcepts: ["go-around"],
       forbiddenPatterns: ["cleared to land"],
+    },
+  },
+
+  /*
+   * ========================================================================
+   * QUESTIONS
+   * ========================================================================
+   *
+   * These are useful because they test whether the model can answer from
+   * authoritative telemetry without inventing information.
+   */
+
+  {
+    name: "Pilot asks current heading",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is currently climbing after departure.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, what is my current heading?",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["223"],
+    },
+  },
+
+  {
+    name: "Pilot asks whether airborne",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft has departed and is currently climbing.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, confirm we're airborne.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["airborne"],
+    },
+  },
+
+  /*
+   * ========================================================================
+   * NEGATIVE / ROBUSTNESS TESTS
+   * ========================================================================
+   */
+
+  {
+    name: "Position report should not become a clearance request",
+
+    aircraftState: downwind,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is established on downwind at pattern altitude.
+        Aircraft has not requested any additional service.
+        No immediate ATC action is required.
+      `.trim(),
+    },
+
+    pilotTransmission: "Tower, currently downwind runway 23, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+    },
+  },
+
+  {
+    name: "Readback should not trigger duplicate clearance",
+
+    aircraftState: holdingShort,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is holding short.
+        The aircraft has already received takeoff clearance.
+      `.trim(),
+    },
+
+    initialConversation: takeoffClearanceIssued,
+
+    pilotTransmission: "Cleared for takeoff runway 23, LV-INQ.",
+
+    expectations: {
+      responseRequired: false,
+      forbiddenPatterns: ["cleared for takeoff"],
+    },
+  },
+
+  {
+    name: "Emergency declaration takes priority",
+
+    aircraftState: initialClimb,
+
+    atcState: {
+      situationContext: `
+        Active runway is 23.
+        Aircraft is airborne and climbing.
+        Treat emergency information as higher priority than routine traffic-pattern instructions.
+      `.trim(),
+    },
+
+    pilotTransmission:
+      "MAYDAY MAYDAY MAYDAY, LV-INQ, engine failure, 700 feet.",
+
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["engine"],
+
+      forbiddenPatterns: [
+        "report downwind",
+        "report base",
+        "report final",
+        "traffic pattern",
+        "cleared for takeoff",
+      ],
     },
   },
 ];
