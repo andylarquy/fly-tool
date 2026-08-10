@@ -1,9 +1,16 @@
 import ollama, { Message } from "ollama";
 import { AircraftState } from "../domain/AircraftState";
-import { AI_SYSTEM_PROMPT } from "./aiConfig"
-import { formatTimestamp } from "../utils/timeFormatting"
-import { MODEL, parseModelContent } from "./modelConfig"
-import { AtcState } from "../domain/AtcState"
+import { AI_SYSTEM_PROMPT } from "./aiConfig";
+import { MODEL, parseModelContent } from "./modelConfig";
+import { AtcState } from "../domain/AtcState";
+import { formatInferenceStats } from "./inferenceStats";
+import { KNOWLEDGE_BASE } from "./knowledgeBase";
+
+const SYSTEM_PROMPT = [
+  AI_SYSTEM_PROMPT,
+  "AVIATION KNOWLEDGE BASE",
+  KNOWLEDGE_BASE,
+].join("\n\n");
 
 const conversationHistory: Message[] = [];
 
@@ -36,8 +43,6 @@ ${transmissionContent}
 SITUATION CONTEXT
 ${atcState.situationContext}`;
 
-  console.log(`${content}\n[${formatTimestamp(new Date())}]`);
-
   const userMessage: Message = { role: "user", content };
 
   const historyUserMessage: Message = {
@@ -45,33 +50,22 @@ ${atcState.situationContext}`;
     content: transmissionContent,
   };
 
-  const start = performance.now();
-
   const response = await ollama.chat({
     model: MODEL,
     messages: [
-      { role: "system", content: AI_SYSTEM_PROMPT },
+      { role: "system", content: SYSTEM_PROMPT },
       ...conversationHistory,
       userMessage,
     ],
     think: "low",
   });
 
-  const end = performance.now();
+  const { content: answer, thinking } = parseModelContent(
+    response.message.content,
+  );
 
-  const answer = parseModelContent(response.message.content);
-
-  console.log(`Inference took ${(end - start).toFixed(0)} ms`);
-  console.log({
-    total: response.total_duration,
-    load: response.load_duration,
-    promptEval: response.prompt_eval_duration,
-    eval: response.eval_duration,
-    promptTokens: response.prompt_eval_count,
-    generatedTokens: response.eval_count,
-    thinkingChars: response.message.thinking?.length ?? 0,
-    contentChars: answer.length,
-  });
+  console.log(`\nThinking:\n${thinking || response.message.thinking || ""}\n`);
+  console.log(`\n${formatInferenceStats(response)}\n`);
 
   const historyAssistantMessage: Message = {
     role: "assistant",

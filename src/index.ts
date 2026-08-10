@@ -61,7 +61,7 @@ async function start(): Promise<void> {
       latestAtcState,
       transmission,
     );
-    console.log(`[${formatTimestamp(new Date())}] ${response}`);
+    console.log(response);
     rl.prompt();
   });
 }

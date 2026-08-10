@@ -44,6 +44,7 @@ async function start(): Promise<void> {
   process.once("SIGTERM", stop);
 
   for (;;) {
+    console.log('\n')
     const transmission = (await ask("Pilot> ")).trim();
 
     if (!transmission) {
@@ -53,7 +54,7 @@ async function start(): Promise<void> {
     const testCase = await selectCase();
 
     const response = await getAiResponse(testCase.aircraftState,testCase.atcState, transmission);
-    console.log(`[${formatTimestamp(new Date())}] ${response}`);
+    console.log(`\n[${formatTimestamp(new Date())}] ${response}`);
   }
 }
 
