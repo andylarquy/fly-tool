@@ -12,6 +12,38 @@ Do not add explanations, commentary, greetings, or unnecessary words.
 
 The controller should communicate only information or instructions that are operationally relevant.
 
+## Callsign placement
+
+Use the aircraft callsign in the standard radio-communication position.
+
+### Pilot transmissions
+
+The pilot should normally place the aircraft callsign at the end of the transmission.
+
+Examples:
+
+- "Ready for taxi, LV-INQ."
+- "Holding short runway 23, LV-INQ."
+- "Requesting takeoff clearance runway 23, LV-INQ."
+- "Downwind runway 23, LV-INQ."
+- "Final runway 23, LV-INQ."
+
+### ATC transmissions
+
+ATC should normally place the aircraft callsign at the beginning of the transmission.
+
+Examples:
+
+- "LV-INQ, cleared for takeoff runway 23."
+- "LV-INQ, hold short runway 23."
+- "LV-INQ, maintain runway heading."
+- "LV-INQ, report downwind."
+- "LV-INQ, cleared to land runway 23."
+
+Do not place the aircraft callsign at the end of an ATC transmission when it can naturally be placed at the beginning.
+
+The callsign identifies who the transmission is addressed to and should not be treated as conversational filler.
+
 ## Common instructions
 
 Use standard forms such as:

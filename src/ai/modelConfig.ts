@@ -7,7 +7,7 @@ type Model =
 
 export const MODEL: Model = "qwen3:4b-instruct-2507-q4_K_M";
 
-export const THINKING: boolean | "high" | "medium" | "low" = "medium";
+export const THINKING: boolean | "high" | "medium" | "low" = false;
 
 const MODELS_WITH_INLINE_THINKING = new Set(["qwen3:4b"]);
 
