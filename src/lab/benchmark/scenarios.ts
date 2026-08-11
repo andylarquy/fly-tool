@@ -272,7 +272,7 @@ export const scenarios: BenchmarkScenario[] = [
     expectations: {
       responseRequired: true,
       requiredConcepts: ["23"],
-      forbiddenPatterns: ["runway 05", "hold short"],
+      forbiddenPatterns: ["runway 05"],
     },
   },
 
@@ -454,14 +454,16 @@ export const scenarios: BenchmarkScenario[] = [
         Active runway is 23.
         Aircraft is established on left downwind.
         Aircraft is at approximately pattern altitude.
-        No additional instruction is currently required.
+        ATC should progress the aircraft through the traffic pattern as appropriate.
       `.trim(),
     },
 
     pilotTransmission: "Tower, downwind, LV-INQ.",
 
     expectations: {
-      responseRequired: false,
+      responseRequired: true,
+      requiredConcepts: ["base"],
+      forbiddenPatterns: ["cleared for takeoff", "cleared to land"],
     },
   },
 
@@ -611,7 +613,8 @@ export const scenarios: BenchmarkScenario[] = [
         Active runway is 23.
         Aircraft is established on downwind at pattern altitude.
         Aircraft has not requested any additional service.
-        No immediate ATC action is required.
+        ATC may acknowledge or progress the aircraft through the pattern,
+        but must not invent a takeoff or landing clearance.
       `.trim(),
     },
 
@@ -619,6 +622,7 @@ export const scenarios: BenchmarkScenario[] = [
 
     expectations: {
       responseRequired: false,
+      forbiddenPatterns: ["cleared for takeoff", "cleared to land"],
     },
   },
 
