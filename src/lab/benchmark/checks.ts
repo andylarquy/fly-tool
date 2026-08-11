@@ -8,8 +8,13 @@ export function evaluateResponse(
 
   const normalized = response.trim().toLowerCase();
 
-  if (expectations.responseRequired && !normalized) {
-    failures.push("Expected an ATC response, but received an empty response.");
+  if (
+    expectations.responseRequired &&
+    (!normalized || normalized === "[no response]")
+  ) {
+    failures.push(
+      `Expected an ATC response, but received: "${response.trim() || "(empty)"}"`,
+    );
   }
 
   if (!expectations.responseRequired && normalized !== "[no response]") {
