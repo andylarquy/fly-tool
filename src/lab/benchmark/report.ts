@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MODEL, THINKING } from "../../ai/modelConfig";
 import { BenchmarkRun, BenchmarkScenario } from "./benchmarkTypes";
 
 const median = (values: number[]): number => {
@@ -106,11 +107,36 @@ export function buildMarkdownReport(results: ScenarioResult[]): string {
 
 const RESULTS_DIR = join(process.cwd(), "benchmark-results");
 
+// e.g. "qwen3:4b-instruct-2507-q4_K_M" -> "qwen3-4b-instruct-2507-q4KM"
+// e.g. "maternion/lfm2.5:8b" -> "maternion-lfm2.5-8b"
+const sanitizeForFilename = (value: string): string =>
+  value.replace(/[:/\\]/g, "-").replace(/_/g, "");
+
+const buildReportBaseName = (): string =>
+  `${sanitizeForFilename(MODEL)}_thinking_${THINKING}`;
+
+const resolveAvailableFilePath = (baseName: string): string => {
+  const plainPath = join(RESULTS_DIR, `${baseName}.md`);
+
+  if (!existsSync(plainPath)) {
+    return plainPath;
+  }
+
+  let suffix = 1;
+  let candidatePath = join(RESULTS_DIR, `${baseName}_${suffix}.md`);
+
+  while (existsSync(candidatePath)) {
+    suffix += 1;
+    candidatePath = join(RESULTS_DIR, `${baseName}_${suffix}.md`);
+  }
+
+  return candidatePath;
+};
+
 export function saveMarkdownReport(markdown: string): string {
   mkdirSync(RESULTS_DIR, { recursive: true });
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filePath = join(RESULTS_DIR, `benchmark-${timestamp}.md`);
+  const filePath = resolveAvailableFilePath(buildReportBaseName());
 
   writeFileSync(filePath, markdown);
 
