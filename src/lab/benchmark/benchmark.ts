@@ -40,8 +40,11 @@ async function runBenchmark(): Promise<void> {
       const start = performance.now();
 
       const result = await getAiResponse(
-        scenario.aircraftState,
-        scenario.atcState,
+        {
+          aircraftState: scenario.aircraftState,
+          atcState: scenario.atcState,
+          flightPlan: { callsign: "LV-INQ" },
+        },
         scenario.pilotTransmission,
       );
 

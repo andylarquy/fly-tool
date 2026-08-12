@@ -2,12 +2,18 @@ import * as readline from "node:readline";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 import { getAiResponse } from "./ai/ai";
 import { formatInferenceStats } from "./ai/inferenceStats";
-import { AircraftState } from "./domain/AircraftState";
 import { formatTimestamp } from "./utils/timeFormatting";
+import { AtcSession } from "./domain/AtcSession";
+import { isEmpty } from "lodash";
 
 const simulator = new MsfsSimulator();
 
-let latestAircraftState: AircraftState | null = null;
+type EmptyObject = Record<string, never>; // {}
+let atcSession: AtcSession | EmptyObject = {};
+
+const isAtcSession = (
+  session: AtcSession | EmptyObject,
+): session is AtcSession => !isEmpty(session);
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
@@ -17,7 +23,7 @@ async function start(): Promise<void> {
   console.log("Connected. Reading user-aircraft telemetry");
 
   simulator.onAircraftStateUpdate((state) => {
-    latestAircraftState = state;
+    atcSession.aircraftState = state;
   });
 
   const rl = readline.createInterface({
@@ -48,18 +54,24 @@ async function start(): Promise<void> {
       return;
     }
 
-    if (!latestAircraftState) {
+    if (!atcSession.aircraftState) {
       console.log("No telemetry received yet, try again shortly.");
       rl.prompt();
       return;
     }
 
     // TODO: Eventually implement a proper ATC context once the lab research ends
-    const latestAtcState = { situationContext: "" };
+    const atcState = { situationContext: "" };
+    atcSession.atcState = atcState;
+
+    // TODO: Eventually implement a proper Flight Plan context once the lab research ends
+    const flightPlan = { callsign: "LV-INQ" };
+    atcSession.flightPlan = flightPlan;
+
+    if (!isAtcSession(atcSession)) return;
 
     const { content, thinking, response } = await getAiResponse(
-      latestAircraftState,
-      latestAtcState,
+      atcSession,
       transmission,
     );
 

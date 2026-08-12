@@ -1,9 +1,8 @@
 import ollama, { ChatResponse, Message } from "ollama";
-import { AircraftState } from "../domain/AircraftState";
 import { AI_SYSTEM_PROMPT } from "./aiConfig";
 import { MODEL, THINKING, parseModelContent } from "./modelConfig";
-import { AtcState } from "../domain/AtcState";
 import { KNOWLEDGE_BASE } from "./knowledgeBase";
+import { AtcSession } from "../domain/AtcSession";
 
 const SYSTEM_PROMPT = [
   AI_SYSTEM_PROMPT,
@@ -36,30 +35,33 @@ export interface AiResponse {
 }
 
 export const getAiResponse = async (
-  aircraftSate: AircraftState,
-  atcState: AtcState,
+  atcSession: AtcSession,
   pilotTransmission: string,
 ): Promise<AiResponse> => {
+  const { aircraftState, flightPlan } = atcSession;
+
   const transmissionContent = formatPilotTransmission(pilotTransmission);
 
   const content = `
 CURRENT AIRCRAFT STATE
 This information comes directly from the simulator and is authoritative.
 
-Callsign: LV-INQ
-Latitude: ${aircraftSate.latitude}
-Longitude: ${aircraftSate.longitude}
-Altitude: ${Math.round(aircraftSate.altitudeFeet)} ft
-Ground speed: ${Math.round(aircraftSate.groundSpeed)} kt
-Heading: ${Math.round(aircraftSate.trueHeading)} degrees
-Pitch: ${aircraftSate.pitch} degrees
-Bank: ${aircraftSate.bank} degrees
-Vertical Speed: ${Math.round(aircraftSate.verticalSpeedFeetPerMinute)} ft/min
-On ground: ${aircraftSate.isOnGround}
+${flightPlan.callsign && `Callsign: ${flightPlan.callsign}`}
+Latitude: ${aircraftState.latitude}
+Longitude: ${aircraftState.longitude}
+Altitude: ${aircraftState.altitudeFeet} ft
+Ground speed: ${aircraftState.groundSpeed} kt
+Heading: ${aircraftState.trueHeading} degrees
+Pitch: ${aircraftState.pitch} degrees
+Bank: ${aircraftState.bank} degrees
+Vertical speed: ${aircraftState.verticalSpeedFeetPerMinute} ft/min
+On ground: ${aircraftState.isOnGround}
+
 ${transmissionContent}
 
 SITUATION CONTEXT
-${atcState.situationContext}`;
+${atcSession.atcState.situationContext}
+`;
 
   const userMessage: Message = { role: "user", content };
 

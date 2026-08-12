@@ -55,8 +55,11 @@ async function start(): Promise<void> {
     const testCase = await selectCase();
 
     const { content, thinking, response } = await getAiResponse(
-      testCase.aircraftState,
-      testCase.atcState,
+      {
+        aircraftState: testCase.aircraftState,
+        atcState: testCase.atcState,
+        flightPlan: { callsign: "LV-INQ" },
+      },
       transmission,
     );
 
