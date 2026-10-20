@@ -41,13 +41,15 @@ export const getAiResponse = async (
   const { aircraftState, flightPlan } = atcSession;
 
   const transmissionContent = formatPilotTransmission(pilotTransmission);
+  const callsignLine = flightPlan.callsign
+    ? `Callsign: ${flightPlan.callsign}\n`
+    : "";
 
   const content = `
 CURRENT AIRCRAFT STATE
 This information comes directly from the simulator and is authoritative.
 
-${flightPlan.callsign && `Callsign: ${flightPlan.callsign}`}
-Latitude: ${aircraftState.latitude}
+${callsignLine}Latitude: ${aircraftState.latitude}
 Longitude: ${aircraftState.longitude}
 Altitude: ${aircraftState.altitudeFeet} ft
 Ground speed: ${aircraftState.groundSpeed} kt
