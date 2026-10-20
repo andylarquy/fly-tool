@@ -2,6 +2,7 @@ import * as readline from "node:readline";
 import { getAiResponse } from "../ai/ai";
 import { formatInferenceStats } from "../ai/inferenceStats";
 import { formatTimestamp } from "../utils/timeFormatting";
+import { DEFAULT_FLIGHT_PLAN } from "../domain/defaultFlightPlan";
 import { cases, LabCase } from "./cases";
 
 const rl = readline.createInterface({
@@ -58,7 +59,7 @@ async function start(): Promise<void> {
       {
         aircraftState: testCase.aircraftState,
         atcState: testCase.atcState,
-        flightPlan: { callsign: "LV-INQ" },
+        flightPlan: DEFAULT_FLIGHT_PLAN,
       },
       transmission,
     );

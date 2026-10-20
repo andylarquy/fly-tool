@@ -3,17 +3,12 @@ import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
 import { getAiResponse } from "./ai/ai";
 import { formatInferenceStats } from "./ai/inferenceStats";
 import { formatTimestamp } from "./utils/timeFormatting";
-import { AtcSession } from "./domain/AtcSession";
-import { isEmpty } from "lodash";
+import { AircraftState } from "./domain/AircraftState";
+import { DEFAULT_FLIGHT_PLAN } from "./domain/defaultFlightPlan";
 
 const simulator = new MsfsSimulator();
 
-type EmptyObject = Record<string, never>; // {}
-let atcSession: AtcSession | EmptyObject = {};
-
-const isAtcSession = (
-  session: AtcSession | EmptyObject,
-): session is AtcSession => !isEmpty(session);
+let latestAircraftState: AircraftState | undefined;
 
 async function start(): Promise<void> {
   console.log("Connecting to Microsoft Flight Simulator 2024");
@@ -23,7 +18,7 @@ async function start(): Promise<void> {
   console.log("Connected. Reading user-aircraft telemetry");
 
   simulator.onAircraftStateUpdate((state) => {
-    atcSession.aircraftState = state;
+    latestAircraftState = state;
   });
 
   const rl = readline.createInterface({
@@ -54,7 +49,7 @@ async function start(): Promise<void> {
       return;
     }
 
-    if (!atcSession.aircraftState) {
+    if (!latestAircraftState) {
       console.log("No telemetry received yet, try again shortly.");
       rl.prompt();
       return;
@@ -62,16 +57,12 @@ async function start(): Promise<void> {
 
     // TODO: Eventually implement a proper ATC context once the lab research ends
     const atcState = { situationContext: "" };
-    atcSession.atcState = atcState;
 
     // TODO: Eventually implement a proper Flight Plan context once the lab research ends
-    const flightPlan = { callsign: "LV-INQ" };
-    atcSession.flightPlan = flightPlan;
-
-    if (!isAtcSession(atcSession)) return;
+    const flightPlan = DEFAULT_FLIGHT_PLAN;
 
     const { content, thinking, response } = await getAiResponse(
-      atcSession,
+      { aircraftState: latestAircraftState, atcState, flightPlan },
       transmission,
     );
 

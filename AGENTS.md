@@ -23,8 +23,9 @@ Implemented:
   benchmark harness (`npm run benchmark`) — see below.
 
 Known gap: `src/index.ts` (the live MSFS path) currently sends an empty
-`AtcState.situationContext` — unlike `lab.ts`/the benchmark, which populate
-it. The live app doesn't have real situational grounding yet.
+`AtcState.situationContext` and the placeholder `DEFAULT_FLIGHT_PLAN` —
+unlike `lab.ts`/the benchmark, which populate the context. The live app
+doesn't have real situational grounding yet.
 
 ## Architecture principles
 
@@ -64,7 +65,11 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
 ## Where things live
 
 - `src/domain/` — plain shared types: `AircraftState` (telemetry), `AtcState`
-  (situation context string).
+  (situation context string), `FlightPlan` (callsign, type, route, ... all
+  optional), and `AtcSession` (the three bundled; this is what
+  `getAiResponse` takes). `defaultFlightPlan.ts` holds the placeholder
+  `DEFAULT_FLIGHT_PLAN` (callsign `LV-INQ`) used by `index.ts`, `lab.ts` and
+  the benchmark until a real flight plan source exists.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
 - `src/ai/`
   - `ai.ts` — orchestrates one ATC turn: builds the prompt, calls Ollama,

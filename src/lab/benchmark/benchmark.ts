@@ -4,6 +4,7 @@ import {
   seedConversationTurn,
 } from "../../ai/ai";
 import { getInferenceMetrics } from "../../ai/inferenceStats";
+import { DEFAULT_FLIGHT_PLAN } from "../../domain/defaultFlightPlan";
 
 import { BenchmarkRun } from "./benchmarkTypes";
 import { evaluateResponse } from "./checks";
@@ -43,7 +44,7 @@ async function runBenchmark(): Promise<void> {
         {
           aircraftState: scenario.aircraftState,
           atcState: scenario.atcState,
-          flightPlan: { callsign: "LV-INQ" },
+          flightPlan: DEFAULT_FLIGHT_PLAN,
         },
         scenario.pilotTransmission,
       );
