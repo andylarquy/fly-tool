@@ -61,7 +61,9 @@ doesn't have real situational grounding yet.
   (`src/ai/classifier/pilotMessageClassifier.ts`, prompt/schema in
   `classifier/classifierConfig.ts`, output type in `domain/PilotMessage.ts`) using
   Ollama structured output, and prints type/runway/subject accuracy plus a
-  confusion summary. Not wired into the live app.
+  confusion summary. Samples that carry emergency details also run
+  `extractEmergencyDetails` and check every field, including ones that must
+  stay empty. Not wired into the live app.
 - `npm run engine` — build + run `src/lab/engine/engine.js`.
   Deterministic (no Ollama): replays scripted pilot messages/phases/events
   through `decide` and checks the resulting `AtcIntent` labels per step.
@@ -74,9 +76,9 @@ doesn't have real situational grounding yet.
   (classify -> derive situation -> engine -> render) over multi-step
   scenarios with phase-consistent telemetry (`pipeline/telemetry.ts`). Many
   scenarios are ported from the benchmark with their original expectations;
-  some disagree with the engine on purpose (it answers a *requested* report
-  with the next instruction and stays silent on unrequested ones). Needs
-  Ollama.
+  scenarios whose expectations were changed to follow the engine are tagged
+  `adapted` (a *requested* report gets the next instruction, an unrequested
+  one gets silence). Needs Ollama.
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -114,6 +116,14 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   or something is owed; a report contradicting the derived phase is always
   queried. Departures always go line up and wait first; once lined up with an
   active line-up clearance, a tick issues the takeoff clearance proactively.
+  Emergencies: `EngineState.emergency` accumulates what the pilot has said
+  (urgency, nature, intention, souls, fuel). Nature and intentions are asked
+  for right away if missing; souls/fuel only once the pilot is not busy
+  (not on takeoff roll, upwind, base, final or landing roll); each question
+  is asked at most once. If the pilot intends to land here, a landing
+  clearance follows on base/final. Position-style subjects (legs,
+  "airborne") are treated as position reports even if the classifier labeled
+  the type `other`.
   Readback checks always correct a wrong runway/clearance; a missing runway is
   tolerated unless strictness is "strict". Not wired into `ai.ts`/`index.ts`.
 - `src/pipeline/` — `runPipelineTurn`: one tick/turn through classify ->
@@ -136,6 +146,12 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
     - `pilotMessageClassifier.ts` — `classifyPilotMessage`, Ollama structured
       output, stateless.
     - `classifierConfig.ts` — its system prompt and JSON schema builder.
+    - `emergencyDetailsExtractor.ts` / `emergencyDetailsConfig.ts` — a second,
+      separate call (`extractEmergencyDetails`) that the pipeline only makes
+      when the message is an emergency or one is already active. Kept out of
+      the main classifier because folding these fields in raised its median
+      latency from ~0.65 s to ~1.8 s and lowered type accuracy.
+    - `parsing.ts` — small shared helpers for validating model output.
   - `speech/` — the controller's spoken side (currently the whole legacy
     single-call ATC turn; will become intent -> wording).
     - `ai.ts` — orchestrates one ATC turn: builds the prompt, calls Ollama,
@@ -147,7 +163,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       Render stage: turns `AtcIntent[]` into one transmission using a small
       phrasebook prompt. Empty intents means no model call (silence).
       `describeIntent` deliberately leaves out internal values such as the
-      touchdown rate so the model can't read them out.
+      touchdown rate so the model can't read them out, and hands the model
+      the exact wording for emergency urgency, nature and questions (the 4B
+      model added questions of its own when asked to choose them).
     - `knowledgeBase.ts` — loads every `.md` file from root-level
       `/knowledge/` (sorted by filename, hence the `01-`, `02-` prefixes),
       concatenates them under a `## filename` heading each, appended to the
