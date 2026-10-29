@@ -1,4 +1,4 @@
-export const AI_SYSTEM_PROMPT = `You are an air traffic controller in an ongoing flight simulation.
+export const SINGLE_CALL_SYSTEM_PROMPT = `You are an air traffic controller in an ongoing flight simulation.
 
 GENERAL BEHAVIOR
 

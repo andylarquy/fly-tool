@@ -1,5 +1,5 @@
 import * as readline from "node:readline";
-import { getAiResponse } from "../../ai/singleCall/singleCallAtc";
+import { getSingleCallResponse } from "../../ai/singleCall/singleCallAtc";
 import { formatInferenceStats } from "../../ai/inferenceStats";
 import { formatTimestamp } from "../../utils/timeFormatting";
 import { DEFAULT_FLIGHT_PLAN } from "../../domain/defaultFlightPlan";
@@ -55,10 +55,10 @@ async function start(): Promise<void> {
 
     const testCase = await selectCase();
 
-    const { content, thinking, response } = await getAiResponse(
+    const { content, thinking, response } = await getSingleCallResponse(
       {
         aircraftState: testCase.aircraftState,
-        atcState: testCase.atcState,
+        context: testCase.context,
         flightPlan: DEFAULT_FLIGHT_PLAN,
       },
       transmission,

@@ -1,11 +1,11 @@
 import ollama, { ChatResponse, Message } from "ollama";
-import { AI_SYSTEM_PROMPT } from "./singleCallPrompt";
+import { SINGLE_CALL_SYSTEM_PROMPT } from "./singleCallPrompt";
 import { MODEL, THINKING, parseModelContent } from "../modelConfig";
 import { KNOWLEDGE_BASE } from "./knowledgeBase";
-import { AtcSession } from "../../domain/SingleCallSession";
+import { SingleCallSession } from "../../domain/SingleCallSession";
 
 const SYSTEM_PROMPT = [
-  AI_SYSTEM_PROMPT,
+  SINGLE_CALL_SYSTEM_PROMPT,
   "AVIATION KNOWLEDGE BASE",
   KNOWLEDGE_BASE,
 ].join("\n\n");
@@ -28,17 +28,17 @@ export const seedConversationTurn = (pilot: string, atc: string): void => {
   );
 };
 
-export interface AiResponse {
+export interface SingleCallResponse {
   content: string;
   thinking: string;
   response: ChatResponse;
 }
 
-export const getAiResponse = async (
-  atcSession: AtcSession,
+export const getSingleCallResponse = async (
+  session: SingleCallSession,
   pilotTransmission: string,
-): Promise<AiResponse> => {
-  const { aircraftState, flightPlan } = atcSession;
+): Promise<SingleCallResponse> => {
+  const { aircraftState, flightPlan } = session;
 
   const transmissionContent = formatPilotTransmission(pilotTransmission);
   const callsignLine = flightPlan.callsign
@@ -62,7 +62,7 @@ On ground: ${aircraftState.isOnGround}
 ${transmissionContent}
 
 SITUATION CONTEXT
-${atcSession.atcState.situationContext}
+${session.context.situationContext}
 `;
 
   const userMessage: Message = { role: "user", content };

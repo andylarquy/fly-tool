@@ -1,6 +1,6 @@
 import * as readline from "node:readline";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
-import { getAiResponse } from "./ai/singleCall/singleCallAtc";
+import { getSingleCallResponse } from "./ai/singleCall/singleCallAtc";
 import { formatInferenceStats } from "./ai/inferenceStats";
 import { formatTimestamp } from "./utils/timeFormatting";
 import { AircraftState } from "./domain/AircraftState";
@@ -56,13 +56,13 @@ async function start(): Promise<void> {
     }
 
     // TODO: Eventually implement a proper ATC context once the lab research ends
-    const atcState = { situationContext: "" };
+    const context = { situationContext: "" };
 
     // TODO: Eventually implement a proper Flight Plan context once the lab research ends
     const flightPlan = DEFAULT_FLIGHT_PLAN;
 
-    const { content, thinking, response } = await getAiResponse(
-      { aircraftState: latestAircraftState, atcState, flightPlan },
+    const { content, thinking, response } = await getSingleCallResponse(
+      { aircraftState: latestAircraftState, context, flightPlan },
       transmission,
     );
 

@@ -1,9 +1,9 @@
 import { AircraftState } from "./AircraftState";
-import { AtcState } from "./SingleCallContext";
+import { SingleCallContext } from "./SingleCallContext";
 import { FlightPlan } from "./FlightPlan";
 
-export interface AtcSession {
+export interface SingleCallSession {
   flightPlan: FlightPlan;
   aircraftState: AircraftState;
-  atcState: AtcState;
+  context: SingleCallContext;
 }

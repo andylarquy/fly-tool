@@ -1,3 +1,3 @@
-export interface AtcState {
+export interface SingleCallContext {
   situationContext: string;
 }

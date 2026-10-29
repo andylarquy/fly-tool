@@ -222,7 +222,7 @@ const decideQuestion = (
   }
 };
 
-export const decideTransmission = (
+export const decidePilotMessage = (
   ctx: DecisionContext,
   previous: EngineState,
   message: PilotMessage,

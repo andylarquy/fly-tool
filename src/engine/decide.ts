@@ -3,7 +3,7 @@ import { EngineState } from "../domain/EngineState";
 import { attachRemark } from "./remarks";
 import { decideEvents } from "./decideEvents";
 import { decideTick } from "./decideTick";
-import { decideTransmission } from "./decidePilotMessage";
+import { decidePilotMessage } from "./decidePilotMessage";
 import { ask } from "./intentBuilders";
 import { Decision, DecisionInput } from "./decisionTypes";
 
@@ -21,7 +21,7 @@ export const decide = (
   };
 
   if (pilot.status === "heard") {
-    apply(decideTransmission(ctx, state, pilot.message));
+    apply(decidePilotMessage(ctx, state, pilot.message));
   } else if (pilot.status === "unintelligible") {
     apply(ask("say_again", { ...state, contacted: true }));
   }

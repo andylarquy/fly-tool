@@ -1,10 +1,10 @@
 import { AircraftState } from "../../domain/AircraftState";
-import { AtcState } from "../../domain/SingleCallContext";
+import { SingleCallContext } from "../../domain/SingleCallContext";
 
 export interface LabCase {
   name: string;
   aircraftState: AircraftState;
-  atcState: AtcState;
+  context: SingleCallContext;
 }
 
 export const cases: LabCase[] = [
@@ -21,7 +21,7 @@ export const cases: LabCase[] = [
       verticalSpeedFeetPerMinute: 0,
       isOnGround: true,
     },
-    atcState: {
+    context: {
       situationContext: `
 Active runway is 23.
 Pilot intention is performing a traffic pattern for runway 23.
@@ -42,7 +42,7 @@ Aircraft is lined up and waiting for takeoff clearance.
       verticalSpeedFeetPerMinute: 789,
       isOnGround: false,
     },
-    atcState: {
+    context: {
       situationContext: `
 Active runway is 23.
 Pilot intention is performing a traffic pattern for runway 23.
@@ -63,7 +63,7 @@ Aircraft just tookoff and is currently climbing.
       verticalSpeedFeetPerMinute: -98,
       isOnGround: false,
     },
-    atcState: {
+    context: {
       situationContext: `
 Active runway is 23.
 Pilot intention is performing a traffic pattern for runway 23.
