@@ -1,0 +1,15 @@
+export enum FlightPhase {
+  Stationary = "stationary",
+  Taxiing = "taxiing",
+  LinedUp = "lined_up",
+  TakeoffRoll = "takeoff_roll",
+  Upwind = "upwind",
+  Crosswind = "crosswind",
+  Downwind = "downwind",
+  Base = "base",
+  Final = "final",
+  LandingRoll = "landing_roll",
+  Inbound = "inbound",
+  Outbound = "outbound",
+  Transiting = "transiting",
+}
