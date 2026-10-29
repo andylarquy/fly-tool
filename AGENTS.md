@@ -80,10 +80,12 @@ doesn't have real situational grounding yet.
   checks the wording with the benchmark's substring checks (plus "starts with
   the callsign"). Needs Ollama; tests the Render stage in isolation.
 - `npm run lab:taxi` — build + run `src/lab/taxi/run.js`. Deterministic (no
-  Ollama): routing over the Lab Field taxi network, then the real situation
-  derivation + engine over generated ground telemetry (request, readback,
-  repeat, wrong turn, wrong hold line, runway entry, taxi to parking, and the
-  fallback away from the network). Exits non-zero on any failure.
+  Ollama): routing and runway matching over the Lab Field taxi network, then
+  the real situation derivation + engine over generated ground telemetry
+  (request, readback, repeat, wrong turn, wrong hold line, runway entry,
+  taxi to parking, crossing the active runway after a hold, crossing another
+  runway inside the route, and the fallback away from the network). Exits
+  non-zero on any failure.
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
@@ -111,15 +113,24 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   `Remark`/`RemarkKind` (the small bits of flavor the engine may add).
   `defaultPilot.ts` holds the placeholder `DEFAULT_PILOT_PROFILE`. Not all of
   these are wired into the live app yet.
-- `src/taxi/routing.ts` — pure taxi-graph functions (no LLM, no sim): nearest
-  point (`LOCATE_RADIUS_FEET` — farther than that an aircraft is "not on the
-  network"), hold-short lookup, nearest parking, Dijkstra `planRoute`, spoken
-  taxiway list (consecutive repeats and unnamed apron paths dropped), and
-  distance from a route. A `TaxiNetwork` (`domain/TaxiNetwork.ts`: points,
+- `src/taxi/routing.ts` — pure taxi-graph functions (no LLM, no sim). The
+  aircraft is located by its nearest *segment* (`LOCATE_RADIUS_FEET`; farther
+  than that it is "not on the network"), not its nearest vertex, because
+  vertices on a straight taxiway can be far apart. `planRouteFrom` starts from
+  both ends of that segment and keeps the segment itself in the route. Routes
+  are Dijkstra with a penalty for crossing a runway, and are spoken as `legs`
+  (taxiway names without repeats, unnamed apron paths dropped, and a "cross
+  runway X" for each `crossesRunway` segment). `holdShortPointFor` picks, of
+  all hold lines labeled with a runway, the one nearest that runway's own
+  threshold (a full-length departure). `sameRunway` knows 23/05 and 05L/23R
+  are the same runway. Also nearest parking and distance from a route. A `TaxiNetwork` (`domain/TaxiNetwork.ts`: points,
   undirected named segments, parking spots, hold-short points) hangs off
   `Airport.taxi` and is optional; the SimConnect adapter will build it from
   `TAXI_POINT`/`TAXI_PATH`/`TAXI_NAME`/`TAXI_PARKING`. `lab/airports.ts` has a
-  fictional one for the Lab Field.
+  fictional one for the Lab Field, including taxiway E, which crosses runway
+  23 at its midpoint to a far-side Ramp 3. The airport's center sits on that
+  crossing, so stage-lab helpers place their generic ground aircraft off the
+  network.
 - `src/situation/` — deterministic derivation, no LLM (`deriveSituation.ts`,
   with `classifyPhase.ts` doing the phase rules). `deriveSituation`
   turns `AircraftState` + `Airport` + active runway into a `Situation`
@@ -158,7 +169,8 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   behavior stays): a taxi/parking request, or "ready for departure" while not
   holding short of the *active* runway, plans a route to the active runway's
   hold line (or the nearest parking) and issues a `taxi_instruction`
-  (`TaxiState` in `EngineState` keeps the route). A readback is checked
+  (`TaxiState` in `EngineState` keeps the route and the legs of the current
+  instruction). A readback is checked
   against the runway; a wrong one re-issues the route as `readback_error`; a
   question or repeated request re-issues it as `repeat`. Each tick checks
   progress: arriving at the destination completes it silently (the pilot then
@@ -166,7 +178,14 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   handoff belongs there); moving >120 ft off the route for 4 s re-plans from
   the current point and issues `off_route` (30 s cooldown); being on a runway
   in the `Taxiing` phase with no runway clearance gives `hold_position`
-  (20 s cooldown). A hold line is the new `FlightPhase.HoldingShort`.
+  (20 s cooldown). Runway crossings: a runway other than the active one is
+  crossed as part of the route ("via Golf, cross runway 13, Golf"). The
+  *active* runway never is: the first instruction ends with "hold short
+  runway 23", and when the pilot is stationary at that point with no runway
+  clearance active, a `continue` instruction ("Cross runway 23. Taxi to ...")
+  follows on its own. While that crossing clearance is in force, being on the
+  runway does not trigger `hold_position`; it ends once the aircraft has been
+  on the runway and left it. A hold line is the new `FlightPhase.HoldingShort`.
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per

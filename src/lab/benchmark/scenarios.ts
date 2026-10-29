@@ -209,6 +209,48 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
+    name: "The active runway is crossed only after holding short and being cleared",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      {
+        position: positions.rampThree,
+        pilot: "Ground, LV-INQ, request taxi for departure.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["taxi to runway 23", "foxtrot, echo", "hold short runway 23"],
+          forbiddenPatterns: ["cross runway"],
+        },
+      },
+      {
+        position: positions.holdingShortLeftOfRunway,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["cross runway 23", "echo, alpha, bravo"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Entering the active runway before the crossing clearance is stopped",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      {
+        position: positions.rampThree,
+        pilot: "Ground, LV-INQ, request taxi for departure.",
+      },
+      {
+        position: positions.middleOfTheRunway,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["hold position"],
+          forbiddenPatterns: ["cleared"],
+        },
+      },
+    ],
+  },
+  {
     name: "Taxi to parking after landing",
     section: "Ground",
     origin: "new",
