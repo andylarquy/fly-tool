@@ -13,7 +13,8 @@
     "dev": "npm run build && npm start",
     "lab": "npm run build && node dist/lab/lab.js",
     "benchmark": "npm run build && node dist/lab/benchmark/benchmark.js",
-    "classify": "npm run build && node dist/lab/classification/classification.js"
+    "classify": "npm run build && node dist/lab/classification/classification.js",
+    "engine": "npm run build && node dist/lab/engine/engine.js"
   },
   "dependencies": {
     "node-simconnect": "^4.2.0",
