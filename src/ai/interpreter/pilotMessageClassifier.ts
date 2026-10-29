@@ -3,7 +3,7 @@ import {
   buildPilotMessageSchema,
   NO_RUNWAY,
   PILOT_MESSAGE_SYSTEM_PROMPT,
-} from "./classifierConfig";
+} from "./pilotMessagePrompt";
 import { MODEL, THINKING } from "../modelConfig";
 import {
   PILOT_MESSAGE_SUBJECTS,

@@ -1,9 +1,9 @@
-import { extractEmergencyDetails } from "../ai/classifier/emergencyDetailsExtractor";
-import { classifyPilotMessage } from "../ai/classifier/pilotMessageClassifier";
-import { renderTransmission } from "../ai/speech/intentRenderer";
-import { createEngineState } from "../engine/clearances";
+import { extractEmergencyDetails } from "../ai/interpreter/emergencyDetailsExtractor";
+import { classifyPilotMessage } from "../ai/interpreter/pilotMessageClassifier";
+import { renderTransmission } from "../ai/renderer/intentRenderer";
+import { createEngineState } from "../engine/engineState";
 import { decide } from "../engine/decide";
-import { PilotInput } from "../engine/types";
+import { PilotInput } from "../engine/decisionTypes";
 import { AircraftState } from "../domain/AircraftState";
 import { Airport } from "../domain/Airport";
 import { AtcIntent } from "../domain/AtcIntent";

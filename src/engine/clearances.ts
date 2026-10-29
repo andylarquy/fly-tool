@@ -11,13 +11,6 @@ const KINDS_BY_SUBJECT: Partial<Record<PilotMessageSubject, ClearanceKind[]>> = 
   pattern_entry: ["pattern_entry"],
 };
 
-export const createEngineState = (runway: string): EngineState => ({
-  runway,
-  clearances: [],
-  contacted: false,
-  remarksMade: [],
-});
-
 export const kindsForSubject = (
   subject: PilotMessageSubject,
 ): ClearanceKind[] | undefined => KINDS_BY_SUBJECT[subject];

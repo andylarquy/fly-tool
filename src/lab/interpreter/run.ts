@@ -1,5 +1,5 @@
-import { extractEmergencyDetails } from "../../ai/classifier/emergencyDetailsExtractor";
-import { classifyPilotMessage } from "../../ai/classifier/pilotMessageClassifier";
+import { extractEmergencyDetails } from "../../ai/interpreter/emergencyDetailsExtractor";
+import { classifyPilotMessage } from "../../ai/interpreter/pilotMessageClassifier";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { MODEL } from "../../ai/modelConfig";
 import { labAirport } from "../airports";

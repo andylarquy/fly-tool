@@ -3,7 +3,7 @@ import { AtcIntent } from "../../domain/AtcIntent";
 import { FlightPhase } from "../../domain/FlightPhase";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { Situation } from "../../domain/Situation";
-import { isAirbornePhase } from "../../situation/flightPhase";
+import { isAirbornePhase } from "../../situation/classifyPhase";
 import { labAirport } from "../airports";
 
 export const msg = (

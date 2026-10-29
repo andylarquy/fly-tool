@@ -4,7 +4,7 @@ import { ControllerStyle } from "../../domain/ControllerStyle";
 import { MODEL, THINKING, parseModelContent } from "../modelConfig";
 import { describeIntent } from "./describeIntent";
 import { RenderedRemark, renderRemark } from "./remarkRenderer";
-import { RENDER_SYSTEM_PROMPT, RENDER_TEMPERATURE } from "./rendererConfig";
+import { RENDER_SYSTEM_PROMPT, RENDER_TEMPERATURE } from "./intentRendererPrompt";
 
 export interface RenderInput {
   callsign?: string;

@@ -1,4 +1,4 @@
-import { renderTransmission } from "../../ai/speech/intentRenderer";
+import { renderTransmission } from "../../ai/renderer/intentRenderer";
 import { MODEL } from "../../ai/modelConfig";
 import { DEFAULT_FLIGHT_PLAN } from "../../domain/defaultFlightPlan";
 import { evaluateResponse } from "../benchmark/checks";

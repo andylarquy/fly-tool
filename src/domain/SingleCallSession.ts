@@ -1,5 +1,5 @@
 import { AircraftState } from "./AircraftState";
-import { AtcState } from "./AtcState";
+import { AtcState } from "./SingleCallContext";
 import { FlightPlan } from "./FlightPlan";
 
 export interface AtcSession {

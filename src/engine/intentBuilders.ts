@@ -2,7 +2,7 @@ import { AtcIntent, ReportPoint } from "../domain/AtcIntent";
 import { ClearanceKind } from "../domain/Clearance";
 import { EngineState } from "../domain/EngineState";
 import { withClearance, withStatus } from "./clearances";
-import { Decision } from "./types";
+import { Decision } from "./decisionTypes";
 
 export const silent = (state: EngineState): Decision => ({
   intents: [],

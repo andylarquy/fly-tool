@@ -5,7 +5,7 @@ import { FlightPhase } from "../domain/FlightPhase";
 import { Remark, RemarkKind } from "../domain/Remark";
 import { daysSince } from "../memory/familiarity";
 import { classifyLanding, isFirmOrWorse } from "../memory/landingQuality";
-import { DecisionContext } from "./types";
+import { DecisionContext } from "./decisionTypes";
 
 const MIN_GAP_BETWEEN_REMARKS_MS = 120_000;
 const REGULAR_FROM_PRIOR_VISITS = 5;

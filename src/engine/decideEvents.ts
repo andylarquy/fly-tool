@@ -1,14 +1,12 @@
 import { AtcIntent } from "../domain/AtcIntent";
 import { FlightEvent } from "../domain/FlightEvent";
 import { FlightPhase } from "../domain/FlightPhase";
-import { isAirbornePhase } from "../situation/flightPhase";
+import { isAirbornePhase } from "../situation/classifyPhase";
 import { findActive, withStatus } from "./clearances";
-import { clear } from "./decisions";
-import { Decision, DecisionContext } from "./types";
+import { Decision, DecisionContext } from "./decisionTypes";
 import { EngineState } from "../domain/EngineState";
 
 const LANDING_KINDS = ["land" as const, "touch_and_go" as const];
-const CONTACT_TIMEOUT_MS = 30_000;
 
 export const decideEvents = (
   ctx: DecisionContext,
@@ -68,31 +66,4 @@ export const decideEvents = (
   }
 
   return { intents, state };
-};
-
-export const decideTick = (
-  { situation }: DecisionContext,
-  state: EngineState,
-): Decision => {
-  if (
-    situation.phase === FlightPhase.LinedUp &&
-    findActive(state, ["line_up_and_wait"]) &&
-    !findActive(state, ["takeoff"])
-  ) {
-    return clear(state, "takeoff", situation.observedAtMs);
-  }
-
-  if (
-    state.airspaceEnteredAtMs !== undefined &&
-    situation.observedAtMs - state.airspaceEnteredAtMs >= CONTACT_TIMEOUT_MS
-  ) {
-    return {
-      intents: state.contacted
-        ? []
-        : [{ type: "query", query: "say_intentions" }],
-      state: { ...state, airspaceEnteredAtMs: undefined },
-    };
-  }
-
-  return { intents: [], state };
 };

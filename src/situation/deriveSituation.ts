@@ -8,7 +8,7 @@ import {
   distanceNauticalMiles,
   runwayOffset,
 } from "../utils/geo";
-import { classifyPhase, isOnRunway } from "./flightPhase";
+import { classifyPhase, isOnRunway } from "./classifyPhase";
 
 const PHASE_DWELL_MS = 3000;
 

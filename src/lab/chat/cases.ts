@@ -1,5 +1,5 @@
-import { AircraftState } from "../domain/AircraftState";
-import { AtcState } from "../domain/AtcState";
+import { AircraftState } from "../../domain/AircraftState";
+import { AtcState } from "../../domain/SingleCallContext";
 
 export interface LabCase {
   name: string;

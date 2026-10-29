@@ -8,8 +8,8 @@ import { EngineState } from "../domain/EngineState";
 import { FlightPhase } from "../domain/FlightPhase";
 import { PilotMessage } from "../domain/PilotMessage";
 import { findActive } from "./clearances";
-import { clear } from "./decisions";
-import { Decision, DecisionContext } from "./types";
+import { clear } from "./intentBuilders";
+import { Decision, DecisionContext } from "./decisionTypes";
 
 const LANDING_INTENTIONS = ["land_at_airport", "land_ahead"];
 

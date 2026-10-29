@@ -9,8 +9,8 @@ import { MODEL, THINKING } from "../modelConfig";
 import {
   EMERGENCY_DETAILS_SCHEMA,
   EMERGENCY_DETAILS_SYSTEM_PROMPT,
-} from "./emergencyDetailsConfig";
-import { pickEnum, positiveInteger } from "./parsing";
+} from "./emergencyDetailsPrompt";
+import { pickEnum, positiveInteger } from "./modelOutputParsing";
 
 const parseEmergencyDetails = (raw: string): EmergencyDetails | undefined => {
   try {
