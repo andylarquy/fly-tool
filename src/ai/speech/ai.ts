@@ -1,8 +1,8 @@
 import ollama, { ChatResponse, Message } from "ollama";
 import { AI_SYSTEM_PROMPT } from "./aiConfig";
-import { MODEL, THINKING, parseModelContent } from "./modelConfig";
+import { MODEL, THINKING, parseModelContent } from "../modelConfig";
 import { KNOWLEDGE_BASE } from "./knowledgeBase";
-import { AtcSession } from "../domain/AtcSession";
+import { AtcSession } from "../../domain/AtcSession";
 
 const SYSTEM_PROMPT = [
   AI_SYSTEM_PROMPT,

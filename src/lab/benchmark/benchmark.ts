@@ -2,7 +2,7 @@ import {
   getAiResponse,
   resetConversation,
   seedConversationTurn,
-} from "../../ai/ai";
+} from "../../ai/speech/ai";
 import { getInferenceMetrics } from "../../ai/inferenceStats";
 import { DEFAULT_FLIGHT_PLAN } from "../../domain/defaultFlightPlan";
 
