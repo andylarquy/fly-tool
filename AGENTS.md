@@ -14,7 +14,7 @@ Implemented:
 - MSFS 2024 telemetry via SimConnect (`src/adapters/msfs2024/MsfsSimulator.ts`).
 - A local Ollama model acting as ATC: given aircraft telemetry + situation
   context + pilot transmission, it returns the next ATC radio transmission
-  or `[NO RESPONSE]` (`src/ai/ai.ts`, prompt in `src/ai/aiConfig.ts`).
+  or `[NO RESPONSE]` (`src/ai/speech/ai.ts`, prompt in `src/ai/speech/aiConfig.ts`).
 - A markdown knowledge base (`/knowledge/*.md`, root-level) appended to the
   system prompt.
 - Conversation history/memory across turns, with explicit reset/seed hooks
@@ -54,6 +54,18 @@ doesn't have real situational grounding yet.
   (`checks.ts`), and writes a markdown report to `/benchmark-results/`
   (gitignored). Requires Ollama running locally with the configured `MODEL`
   pulled; takes a few minutes.
+- `npm run classify` — build + run `src/lab/classification/classification.js`.
+  Experiment for the planned "language -> structured JSON -> code logic ->
+  language" pipeline: runs labeled pilot transmissions
+  (`classification/samples.ts`) through `classifyPilotMessage`
+  (`src/ai/classifier/pilotMessageClassifier.ts`, prompt/schema in
+  `classifier/classifierConfig.ts`, output type in `domain/PilotMessage.ts`) using
+  Ollama structured output, and prints type/runway/subject accuracy plus a
+  confusion summary. Not wired into the live app.
+- `npm run engine` — build + run `src/lab/engine/engine.js`.
+  Deterministic (no Ollama): replays scripted pilot messages/phases/events
+  through `decide` and checks the resulting `AtcIntent` labels per step.
+  Exits non-zero on any mismatch.
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -70,29 +82,62 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   `getAiResponse` takes). `defaultFlightPlan.ts` holds the placeholder
   `DEFAULT_FLIGHT_PLAN` (callsign `LV-INQ`) used by `index.ts`, `lab.ts` and
   the benchmark until a real flight plan source exists.
+  Also the world/memory model: `Airport`/`Runway`/`Facility` (static data),
+  `FlightPhase`, `Situation` and `FlightEvent` (derived, see below),
+  `Clearance`/`PilotIntent` (session state), `PilotRecord` (long-term memory
+  keyed by pilot profile, not callsign, behind `PilotRecordStore`). Not all of
+  these are wired into `AtcSession`/`ai.ts` yet.
+- `src/situation/` — deterministic derivation, no LLM. `deriveSituation`
+  turns `AircraftState` + `Airport` + active runway into a `Situation`
+  (flight phase, runway-relative geometry) plus `FlightEvent`s (touchdown,
+  lifted off, go-around, airspace entry/exit, phase changes). Stateful across
+  ticks via the `previous` argument; a new phase must persist for
+  `PHASE_DWELL_MS` before it commits (ground/air flips commit immediately). Touchdown rate is the vertical
+  speed of the last airborne sample.
+- `src/engine/` — the ATC engine (the Decide layer): deterministic, no LLM. `decide(input,
+  state)` takes the classified `PilotMessage` (or none/unintelligible), the
+  `Situation`, `FlightEvent`s and a `ControllerStyle`, and returns
+  `AtcIntent[]` (empty = stay silent) plus the next `EngineState`
+  (clearances issued, `expectedReport`, contact/airspace tracking). ATC only
+  answers a position report when it was expected (a prior "report downwind")
+  or something is owed; a report contradicting the derived phase is always
+  queried. Departures always go line up and wait first; once lined up with an
+  active line-up clearance, a tick issues the takeoff clearance proactively.
+  Readback checks always correct a wrong runway/clearance; a missing runway is
+  tolerated unless strictness is "strict". Not wired into `ai.ts`/`index.ts`.
+- `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
-- `src/ai/`
-  - `ai.ts` — orchestrates one ATC turn: builds the prompt, calls Ollama,
-    returns `{ content, thinking, response }`. Owns the module-level
-    `conversationHistory`.
-  - `aiConfig.ts` — the system prompt (`AI_SYSTEM_PROMPT`). Edited by hand;
-    don't rewrite it as a side effect of other changes.
-  - `modelConfig.ts` — single source of truth for `MODEL` and `THINKING`.
-    Also has the per-model workaround for models that ignore `think: false`
-    and inline reasoning into `content` instead of the dedicated `thinking`
-    field (`MODELS_WITH_INLINE_THINKING`).
-  - `inferenceStats.ts` — turns Ollama's raw nanosecond durations into
-    `InferenceMetrics` (seconds, tokens, tok/s). Takes the raw `ChatResponse`
-    — i.e. `getAiResponse(...).response`, not the `AiResponse` wrapper
-    itself.
-  - `knowledgeBase.ts` — loads every `.md` file from root-level `/knowledge/`
-    (sorted by filename, hence the `01-`, `02-` prefixes), concatenates them
-    under a `## filename` heading each, appended to the system prompt in
-    `ai.ts`. Deliberately **not** under `src/` — `tsc` only emits `.ts`
-    output to `dist/`, so any asset a compiled script reads at runtime needs
-    to live outside `src/` and be resolved via `process.cwd()`. The same
-    applies to `/benchmark-results/`.
+- `src/ai/` — everything that talks to Ollama, split by job:
+  - Shared at the root:
+    - `modelConfig.ts` — single source of truth for `MODEL` and `THINKING`.
+      Also has the per-model workaround for models that ignore `think: false`
+      and inline reasoning into `content` instead of the dedicated `thinking`
+      field (`MODELS_WITH_INLINE_THINKING`).
+    - `inferenceStats.ts` — turns Ollama's raw nanosecond durations into
+      `InferenceMetrics` (seconds, tokens, tok/s). Takes the raw
+      `ChatResponse` — i.e. `getAiResponse(...).response`, not the
+      `AiResponse` wrapper itself.
+  - `classifier/` — language -> structured JSON (pilot side).
+    - `pilotMessageClassifier.ts` — `classifyPilotMessage`, Ollama structured
+      output, stateless.
+    - `classifierConfig.ts` — its system prompt and JSON schema builder.
+  - `speech/` — the controller's spoken side (currently the whole legacy
+    single-call ATC turn; will become intent -> wording).
+    - `ai.ts` — orchestrates one ATC turn: builds the prompt, calls Ollama,
+      returns `{ content, thinking, response }`. Owns the module-level
+      `conversationHistory`.
+    - `aiConfig.ts` — the system prompt (`AI_SYSTEM_PROMPT`). Edited by hand;
+      don't rewrite it as a side effect of other changes.
+    - `knowledgeBase.ts` — loads every `.md` file from root-level
+      `/knowledge/` (sorted by filename, hence the `01-`, `02-` prefixes),
+      concatenates them under a `## filename` heading each, appended to the
+      system prompt in `ai.ts`. Deliberately **not** under `src/` — `tsc`
+      only emits `.ts` output to `dist/`, so any asset a compiled script
+      reads at runtime needs to live outside `src/` and be resolved via
+      `process.cwd()`. The same applies to `/benchmark-results/`.
 - `src/lab/`
+  - `airports.ts` — fictional "Lab Field" (`ZZZZ`) with runways 23/05 and a
+    tower, used to exercise the situation derivation. Not real data.
   - `cases.ts` — fixed `AircraftState`/`AtcState` fixtures for the
     interactive `lab.ts` CLI.
   - `lab.ts` — interactive loop, same shape as `index.ts` but sourcing state
@@ -130,8 +175,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   actually be in `initialConversation` — a pilot line that merely *sounds*
   like a readback with no prior ATC instruction in history doesn't test what
   it claims to.
-- **New concern → new file**, following the existing `src/ai/*.ts` split
-  (prompt vs. model config vs. stats vs. knowledge loading). Don't let
+- **New concern → new file**, following the existing `src/ai/` split
+  (per-job folders; within them prompt vs. model config vs. stats vs.
+  knowledge loading). Don't let
   `ai.ts` or `benchmark.ts` grow into catch-alls.
 - **No comments unless the WHY is genuinely non-obvious.** This codebase is
   otherwise comment-free by convention.
