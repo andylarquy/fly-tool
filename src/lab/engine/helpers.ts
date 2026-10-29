@@ -29,6 +29,14 @@ export const label = (intent: AtcIntent): string => {
       return `advise:${intent.topic}`;
     case "unable":
       return `unable:${intent.reason}`;
+    case "taxi_instruction": {
+      const where =
+        intent.destination.kind === "runway"
+          ? `runway ${intent.destination.runway}`
+          : intent.destination.name;
+
+      return `taxi_instruction:${intent.reason}:${where}:${intent.taxiways.join("+") || "-"}`;
+    }
     case "acknowledge":
       return `acknowledge:${intent.kind}`;
     case "remark":

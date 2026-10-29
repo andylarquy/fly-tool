@@ -11,6 +11,11 @@ import {
   withStatus,
 } from "./clearances";
 import { decideEmergency, hasEmergencyDetails } from "./decideEmergency";
+import {
+  decideTaxiRequest,
+  isOnTaxiNetwork,
+  repeatTaxiInstruction,
+} from "./decideTaxi";
 import { ask, clear, instructReport, say, silent } from "./intentBuilders";
 import {
   asReportPoint,
@@ -33,21 +38,32 @@ const runwayOf = ({ airport }: DecisionContext, state: EngineState): Runway => {
 };
 
 const requestDeparture = (
-  { situation }: DecisionContext,
+  ctx: DecisionContext,
   state: EngineState,
 ): Decision => {
+  const { situation } = ctx;
+
   if (findActive(state, ["takeoff"])) {
     return silent(state);
   }
 
+  const lineUp = (): Decision =>
+    findActive(state, ["line_up_and_wait"])
+      ? silent(state)
+      : clear(state, "line_up_and_wait", situation.observedAtMs);
+
   switch (situation.phase) {
     case FlightPhase.LinedUp:
       return clear(state, "takeoff", situation.observedAtMs);
+    case FlightPhase.HoldingShort:
+      return situation.holdingShortRunway === state.runway
+        ? lineUp()
+        : decideTaxiRequest(ctx, state, "runway");
     case FlightPhase.Stationary:
     case FlightPhase.Taxiing:
-      return findActive(state, ["line_up_and_wait"])
-        ? silent(state)
-        : clear(state, "line_up_and_wait", situation.observedAtMs);
+      return isOnTaxiNetwork(ctx)
+        ? decideTaxiRequest(ctx, state, "runway")
+        : lineUp();
     default:
       return ask("say_again", state);
   }
@@ -111,6 +127,10 @@ const decideRequest = (
     case "line_up":
     case "hold_short":
       return requestDeparture(ctx, state);
+    case "taxi":
+      return decideTaxiRequest(ctx, state, "runway");
+    case "parking":
+      return decideTaxiRequest(ctx, state, "parking");
     case "landing":
       return directArrival(ctx, state, true);
     case "pattern_entry":
@@ -135,7 +155,14 @@ const decideReadback = (
 
   const expectedKinds = kindsForSubject(message.subject);
   const wrongClearance = expectedKinds && !expectedKinds.includes(pending.kind);
-  const wrongRunway = message.runway !== null && message.runway !== pending.runway;
+  const wrongRunway =
+    message.runway !== null &&
+    pending.runway !== "" &&
+    message.runway !== pending.runway;
+
+  if ((wrongClearance || wrongRunway) && pending.kind === "taxi") {
+    return repeatTaxiInstruction(state, "readback_error");
+  }
 
   if (wrongClearance || wrongRunway) {
     return say(
@@ -144,7 +171,12 @@ const decideReadback = (
     );
   }
 
-  if (expectedKinds && message.runway === null && style.strictness === "strict") {
+  if (
+    expectedKinds &&
+    message.runway === null &&
+    pending.runway !== "" &&
+    style.strictness === "strict"
+  ) {
     return ask("full_readback", state);
   }
 
@@ -217,6 +249,9 @@ const decideQuestion = (
         { type: "advise", topic: "airborne", value: !aircraft.isOnGround },
         state,
       );
+    case "taxi":
+    case "parking":
+      return repeatTaxiInstruction(state, "repeat");
     default:
       return say({ type: "unable", reason: "no_information" }, state);
   }

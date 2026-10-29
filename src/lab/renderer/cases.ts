@@ -273,6 +273,122 @@ export const renderCases: RenderCase[] = [
     },
   },
   {
+    name: "Taxi instruction to a runway",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "runway", runway: "23" },
+        taxiways: ["C", "A", "B"],
+        holdShort: "23",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["taxi to runway 23", "charlie, alpha, bravo", "hold short runway 23"],
+      forbiddenPatterns: ["cleared"],
+    },
+  },
+  {
+    name: "Taxi instruction with a numbered taxiway",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "runway", runway: "05" },
+        taxiways: ["A1", "B"],
+        holdShort: "05",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["taxi to runway 05", "alpha 1, bravo", "hold short runway 05"],
+    },
+  },
+  {
+    name: "Taxi instruction to parking has no hold short",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "parking", name: "Ramp 1" },
+        taxiways: ["C"],
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["taxi to ramp 1", "charlie"],
+      forbiddenPatterns: ["hold short", "runway"],
+    },
+  },
+  {
+    name: "Taxi instruction with no named taxiway",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "runway", runway: "23" },
+        taxiways: [],
+        holdShort: "23",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["taxi to runway 23", "hold short runway 23"],
+      forbiddenPatterns: ["via"],
+    },
+  },
+  {
+    name: "Wrong turn correction",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "off_route",
+        destination: { kind: "runway", runway: "23" },
+        taxiways: ["A", "B"],
+        holdShort: "23",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["off", "taxi to runway 23", "alpha, bravo"],
+    },
+  },
+  {
+    name: "Taxi readback correction",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "readback_error",
+        destination: { kind: "runway", runway: "23" },
+        taxiways: ["C", "A", "B"],
+        holdShort: "23",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["negative", "taxi to runway 23", "charlie, alpha, bravo"],
+    },
+  },
+  {
+    name: "Hold short instruction",
+    intents: [{ type: "instruct", instruction: "hold_short", runway: "23" }],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["hold short runway 23"],
+      forbiddenPatterns: ["cleared", "taxi"],
+    },
+  },
+  {
+    name: "Hold position",
+    intents: [{ type: "instruct", instruction: "hold_position" }],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["hold position"],
+      forbiddenPatterns: ["cleared", "runway"],
+    },
+  },
+  {
     name: "Readback confirmed in strict mode",
     strictness: "strict",
     intents: [{ type: "acknowledge", kind: "readback_correct" }],

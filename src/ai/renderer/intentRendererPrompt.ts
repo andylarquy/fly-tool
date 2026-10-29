@@ -25,6 +25,9 @@ PHRASEBOOK (intent -> standard form, written without the callsign; always put th
 - instruct_report: "Report <report>."
 - instruct_go_around: "Roger, go around, report <report>."
 - instruct_vacate_runway: "Vacate runway <runway>."
+- instruct_hold_short: "Hold short runway <runway>."
+- instruct_hold_position: "Hold position."
+- taxi_instruction: write the lead_in first if one is given, then the text exactly as given. Never change the taxiway names or their order.
 - correct_readback: "Negative, " followed by the clearance form above, for example "Negative, cleared for takeoff runway 23."
 - advise_heading: "Heading <value>."
 - advise_airborne: value=true: "You are airborne." value=false: "You are on the ground."

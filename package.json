@@ -15,6 +15,7 @@
     "lab:benchmark": "npm run build && node dist/lab/benchmark/run.js",
     "lab:interpreter": "npm run build && node dist/lab/interpreter/run.js",
     "lab:engine": "npm run build && node dist/lab/engine/run.js",
+    "lab:taxi": "npm run build && node dist/lab/taxi/run.js",
     "lab:memory": "npm run build && node dist/lab/memory/run.js",
     "lab:renderer": "npm run build && node dist/lab/renderer/run.js"
   },

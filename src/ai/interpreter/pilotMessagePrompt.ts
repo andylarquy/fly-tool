@@ -25,6 +25,8 @@ subject:
 - landing: landing clearance or a request to land, including touch and go.
 - line_up: line up and wait.
 - hold_short: hold short instruction.
+- taxi: taxiing toward a runway, asking for taxi instructions or a taxi route, reading back taxi instructions or taxiways, or asking about the taxi route.
+- parking: any transmission whose destination is parking, the ramp, the apron, a hangar or a gate, even when it also says "taxi". This wins over taxi.
 - pattern_entry: entering or joining the traffic pattern, including left or right traffic.
 - altitude: climbing, descending, or an altitude instruction or request.
 - heading: heading or turn instruction, or a question about heading.

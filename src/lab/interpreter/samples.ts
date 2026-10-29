@@ -235,6 +235,45 @@ export const samples: ClassificationSample[] = [
     expected: msg("readback", "23", "takeoff"),
   },
   {
+    pilot: "Ground, LV-INQ, request taxi for departure.",
+    expected: msg("request", null, "taxi"),
+  },
+  {
+    pilot: "Tower, request taxi to runway 23, LV-INQ.",
+    expected: msg("request", "23", "taxi"),
+  },
+  {
+    pilot: "Ready for taxi, LV-INQ.",
+    expected: msg("request", null, "taxi"),
+  },
+  {
+    pilot: "Torre, solicito rodaje a la pista 23, LV-INQ.",
+    expected: msg("request", "23", "taxi"),
+  },
+  {
+    pilot: "LV-INQ, clear of the runway, request taxi to parking.",
+    expected: msg("request", null, "parking"),
+  },
+  {
+    pilot: "Request taxi to the ramp, LV-INQ.",
+    expected: msg("request", null, "parking"),
+  },
+  {
+    pilot: "Taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23, LV-INQ.",
+    lastAtc: "LV-INQ, taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23.",
+    expected: msg("readback", "23", "taxi"),
+  },
+  {
+    pilot: "Taxi to Ramp 1 via Charlie, LV-INQ.",
+    lastAtc: "LV-INQ, taxi to Ramp 1 via Charlie.",
+    expected: msg("readback", null, "parking"),
+  },
+  {
+    pilot: "Say again the taxi route, LV-INQ.",
+    lastAtc: "LV-INQ, taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23.",
+    expected: msg("question", null, "taxi"),
+  },
+  {
     pilot: "Thanks, tower.",
     lastAtc: "LV-INQ, wind two three zero at eight knots.",
     expected: msg("other", null, "other"),

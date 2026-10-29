@@ -9,6 +9,8 @@ const KINDS_BY_SUBJECT: Partial<Record<PilotMessageSubject, ClearanceKind[]>> = 
   landing: ["land", "touch_and_go"],
   line_up: ["line_up_and_wait"],
   pattern_entry: ["pattern_entry"],
+  taxi: ["taxi"],
+  parking: ["taxi"],
 };
 
 export const kindsForSubject = (
@@ -32,11 +34,12 @@ export const withClearance = (
   state: EngineState,
   kind: ClearanceKind,
   nowMs: number,
+  runway = state.runway,
 ): EngineState => ({
   ...state,
   clearances: [
     ...state.clearances,
-    { kind, runway: state.runway, issuedAtMs: nowMs, status: "issued" },
+    { kind, runway, issuedAtMs: nowMs, status: "issued" },
   ],
 });
 

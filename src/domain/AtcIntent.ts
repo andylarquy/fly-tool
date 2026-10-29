@@ -2,6 +2,7 @@ import { PatternSide } from "./Airport";
 import { ClearanceKind } from "./Clearance";
 import { EmergencyNature, EmergencyQuestion, EmergencyUrgency } from "./Emergency";
 import { FlightPhase } from "./FlightPhase";
+import { TaxiDestination, TaxiInstructionReason } from "./Taxi";
 import { Remark } from "./Remark";
 
 export type ReportPoint = "crosswind" | "downwind" | "base" | "final";
@@ -15,7 +16,13 @@ export type AtcIntent =
     }
   | {
       type: "instruct";
-      instruction: "report" | "enter_pattern" | "go_around" | "vacate_runway";
+      instruction:
+        | "report"
+        | "enter_pattern"
+        | "go_around"
+        | "vacate_runway"
+        | "hold_short"
+        | "hold_position";
       runway?: string;
       patternSide?: PatternSide;
       altitudeFeetAgl?: number;
@@ -30,6 +37,13 @@ export type AtcIntent =
       claimed?: ReportPoint;
       observed?: FlightPhase;
     }
+  | {
+      type: "taxi_instruction";
+      reason: TaxiInstructionReason;
+      destination: TaxiDestination;
+      taxiways: string[];
+      holdShort?: string;
+    }
   | { type: "remark"; remark: Remark }
   | { type: "acknowledge"; kind: "readback_correct" | "courtesy" }
   | {
@@ -38,4 +52,4 @@ export type AtcIntent =
       nature?: EmergencyNature;
       ask: EmergencyQuestion[];
     }
-  | { type: "unable"; reason: "no_information" | "not_supported" };
+  | { type: "unable"; reason: "no_information" | "not_supported" | "no_route" };

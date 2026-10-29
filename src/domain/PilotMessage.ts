@@ -11,6 +11,8 @@ export const PILOT_MESSAGE_SUBJECTS = [
   "takeoff",
   "landing",
   "line_up",
+  "taxi",
+  "parking",
   "hold_short",
   "pattern_entry",
   "altitude",

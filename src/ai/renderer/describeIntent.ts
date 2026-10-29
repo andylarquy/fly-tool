@@ -1,4 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
+import { TaxiDestination, TaxiInstructionReason } from "../../domain/Taxi";
 import {
   EmergencyNature,
   EmergencyQuestion,
@@ -10,6 +11,38 @@ const fields = (entries: [string, string | number | boolean | undefined][]): str
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${value}`)
     .join(" | ");
+
+const NATO: Record<string, string> = {
+  A: "Alpha", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo", F: "Foxtrot",
+  G: "Golf", H: "Hotel", I: "India", J: "Juliett", K: "Kilo", L: "Lima",
+  M: "Mike", N: "November", O: "Oscar", P: "Papa", Q: "Quebec", R: "Romeo",
+  S: "Sierra", T: "Tango", U: "Uniform", V: "Victor", W: "Whiskey",
+  X: "X-ray", Y: "Yankee", Z: "Zulu",
+};
+
+export const spokenTaxiway = (name: string): string =>
+  name
+    .split("")
+    .map((character) => NATO[character.toUpperCase()] ?? character)
+    .join(" ");
+
+const TAXI_LEAD_IN: Partial<Record<TaxiInstructionReason, string>> = {
+  readback_error: "Negative.",
+  off_route: "You are off the assigned route.",
+};
+
+const taxiSentence = (
+  destination: TaxiDestination,
+  taxiways: string[],
+  holdShort?: string,
+): string => {
+  const where =
+    destination.kind === "runway" ? `runway ${destination.runway}` : destination.name;
+  const via = taxiways.length > 0 ? ` via ${taxiways.map(spokenTaxiway).join(", ")}` : "";
+  const hold = holdShort ? `, hold short runway ${holdShort}` : "";
+
+  return `Taxi to ${where}${via}${hold}.`;
+};
 
 const URGENCY_WORDS: Record<EmergencyUrgency, string> = {
   mayday: "MAYDAY",
@@ -79,6 +112,12 @@ export const describeIntent = (intent: AtcIntent): string => {
         ["intent", `query_${intent.query}`],
         ["pilot_said", intent.claimed],
         ["we_observe", intent.observed && words(intent.observed)],
+      ]);
+    case "taxi_instruction":
+      return fields([
+        ["intent", "taxi_instruction"],
+        ["lead_in", TAXI_LEAD_IN[intent.reason]],
+        ["text", taxiSentence(intent.destination, intent.taxiways, intent.holdShort)],
       ]);
     case "remark":
       return fields([["intent", "remark"], ["kind", intent.remark.kind]]);
