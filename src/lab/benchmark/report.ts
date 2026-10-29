@@ -166,8 +166,9 @@ const RESULTS_DIR = join(process.cwd(), "benchmark-results");
 const sanitizeForFilename = (value: string): string =>
   value.replace(/[:/\\]/g, "-").replace(/_/g, "");
 
-const buildReportBaseName = (): string =>
-  `${sanitizeForFilename(MODEL)}_thinking_${THINKING}`;
+const buildReportBaseName = (filter?: string): string =>
+  `${sanitizeForFilename(MODEL)}_thinking_${THINKING}` +
+  (filter ? `_only-${filter.replace(/[^a-z0-9]+/g, "-")}` : "");
 
 const resolveAvailableFilePath = (baseName: string): string => {
   const plainPath = join(RESULTS_DIR, `${baseName}.md`);
@@ -187,10 +188,10 @@ const resolveAvailableFilePath = (baseName: string): string => {
   return candidatePath;
 };
 
-export function saveMarkdownReport(markdown: string): string {
+export function saveMarkdownReport(markdown: string, filter?: string): string {
   mkdirSync(RESULTS_DIR, { recursive: true });
 
-  const filePath = resolveAvailableFilePath(buildReportBaseName());
+  const filePath = resolveAvailableFilePath(buildReportBaseName(filter));
 
   writeFileSync(filePath, markdown);
 

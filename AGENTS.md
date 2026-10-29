@@ -56,6 +56,8 @@ doesn't have real situational grounding yet.
   checks (`checks.ts`), and a markdown report with per-scenario pass rates and
   per-stage latency is written to `/benchmark-results/` (gitignored). Needs
   Ollama running with the configured `MODEL` pulled; takes several minutes.
+  `npm run lab:benchmark -- --section ground` (or `--scenario <text>`) runs a
+  subset and writes a report with an `_only-<filter>` suffix.
   Scenarios are tagged `ported` (original expectation kept), `adapted`
   (original intent, but following the engine: a *requested* report gets the
   next instruction, an unrequested one gets silence) or `new`.
@@ -77,6 +79,11 @@ doesn't have real situational grounding yet.
   `AtcIntent` lists (`render/cases.ts`) to `renderTransmission` 3x each and
   checks the wording with the benchmark's substring checks (plus "starts with
   the callsign"). Needs Ollama; tests the Render stage in isolation.
+- `npm run lab:taxi` — build + run `src/lab/taxi/run.js`. Deterministic (no
+  Ollama): routing over the Lab Field taxi network, then the real situation
+  derivation + engine over generated ground telemetry (request, readback,
+  repeat, wrong turn, wrong hold line, runway entry, taxi to parking, and the
+  fallback away from the network). Exits non-zero on any failure.
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
@@ -104,6 +111,15 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   `Remark`/`RemarkKind` (the small bits of flavor the engine may add).
   `defaultPilot.ts` holds the placeholder `DEFAULT_PILOT_PROFILE`. Not all of
   these are wired into the live app yet.
+- `src/taxi/routing.ts` — pure taxi-graph functions (no LLM, no sim): nearest
+  point (`LOCATE_RADIUS_FEET` — farther than that an aircraft is "not on the
+  network"), hold-short lookup, nearest parking, Dijkstra `planRoute`, spoken
+  taxiway list (consecutive repeats and unnamed apron paths dropped), and
+  distance from a route. A `TaxiNetwork` (`domain/TaxiNetwork.ts`: points,
+  undirected named segments, parking spots, hold-short points) hangs off
+  `Airport.taxi` and is optional; the SimConnect adapter will build it from
+  `TAXI_POINT`/`TAXI_PATH`/`TAXI_NAME`/`TAXI_PARKING`. `lab/airports.ts` has a
+  fictional one for the Lab Field.
 - `src/situation/` — deterministic derivation, no LLM (`deriveSituation.ts`,
   with `classifyPhase.ts` doing the phase rules). `deriveSituation`
   turns `AircraftState` + `Airport` + active runway into a `Situation`
@@ -118,7 +134,8 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   about events and about time passing), `decideEmergency.ts`, `remarks.ts`,
   `pattern.ts` (traffic-pattern leg helpers), `clearances.ts` (clearance
   helpers on `EngineState`), `engineState.ts` (`createEngineState`),
-  `intentBuilders.ts` (`silent`/`say`/`ask`/`clear`), `decisionTypes.ts`.
+  `intentBuilders.ts` (`silent`/`say`/`ask`/`clear`), `decisionTypes.ts`,
+  `decideTaxi.ts` (ground guidance, below).
   `decide(input,
   state)` takes the classified `PilotMessage` (or none/unintelligible), the
   `Situation`, `FlightEvent`s and a `ControllerStyle`, and returns
@@ -136,6 +153,20 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   clearance follows on base/final. Position-style subjects (legs,
   "airborne") are treated as position reports even if the classifier labeled
   the type `other`.
+  Ground guidance (`decideTaxi.ts`, only when `Airport.taxi` exists and the
+  aircraft is within `LOCATE_RADIUS_FEET` of the network; otherwise the old
+  behavior stays): a taxi/parking request, or "ready for departure" while not
+  holding short of the *active* runway, plans a route to the active runway's
+  hold line (or the nearest parking) and issues a `taxi_instruction`
+  (`TaxiState` in `EngineState` keeps the route). A readback is checked
+  against the runway; a wrong one re-issues the route as `readback_error`; a
+  question or repeated request re-issues it as `repeat`. Each tick checks
+  progress: arriving at the destination completes it silently (the pilot then
+  asks for departure and gets line up and wait — the future ground-to-tower
+  handoff belongs there); moving >120 ft off the route for 4 s re-plans from
+  the current point and issues `off_route` (30 s cooldown); being on a runway
+  in the `Taxiing` phase with no runway clearance gives `hold_position`
+  (20 s cooldown). A hold line is the new `FlightPhase.HoldingShort`.
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per
@@ -189,6 +220,7 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       Empty intents means no model call (silence). `describeIntent`
       deliberately leaves out internal values such as the touchdown rate so
       the model can't read them out, and hands the model the exact wording for
+      taxi routes (taxiways spoken phonetically, composed in code),
       emergency urgency, nature and questions (the 4B model added questions of
       its own when asked to choose them).
     - `remarkRenderer.ts` / `remarkConfig.ts` — remarks are improvised, in a

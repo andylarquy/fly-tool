@@ -55,7 +55,179 @@ const withExpectation = (
   expect: BenchmarkExpectations,
 ): BenchmarkStep => ({ ...step, expect });
 
+const requestTaxi: BenchmarkStep = {
+  position: positions.rampSpot,
+  pilot: "Ground, LV-INQ, request taxi for departure.",
+};
+
 export const scenarios: BenchmarkScenario[] = [
+  /* ===================================================================== */
+  /* GROUND                                                                */
+  /* ===================================================================== */
+
+  {
+    name: "Request taxi from the ramp",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      withExpectation(requestTaxi, {
+        responseRequired: true,
+        requiredConcepts: [
+          "taxi to runway 23",
+          "charlie, alpha, bravo",
+          "hold short runway 23",
+        ],
+        forbiddenPatterns: ["cleared"],
+      }),
+    ],
+  },
+  {
+    name: "Ready for departure from the ramp is answered with a taxi route",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      {
+        position: positions.rampSpot,
+        pilot: "Tower, ready for departure, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["taxi to runway 23", "bravo"],
+          forbiddenPatterns: ["line up", "cleared for takeoff"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Taxi readback is accepted",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23, LV-INQ.",
+        expect: silent,
+      },
+    ],
+  },
+  {
+    name: "Taxi readback with the wrong runway is corrected",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 05 via Charlie, Alpha, Bravo, hold short runway 05, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["negative", "taxi to runway 23"],
+          forbiddenPatterns: ["runway 05"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Pilot asks for the taxi route again",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Say again the taxi route, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["taxi to runway 23", "charlie, alpha, bravo"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A wrong turn is corrected",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.wrongWayOnAlpha,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["alpha, bravo", "hold short runway 23"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Arriving at the hold line stays quiet, then line up and wait",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      { position: positions.taxiingOnAlpha, expect: silent },
+      { position: positions.holdingShort, expect: silent },
+      {
+        position: positions.holdingShort,
+        pilot: "Tower, holding short runway 23, ready for departure, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["line up and wait", "23"],
+          forbiddenPatterns: ["taxi"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Holding short of the wrong runway is sent to the active one",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      {
+        position: positions.holdingShortFarEnd,
+        pilot: "Tower, ready for departure, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["taxi to runway 23", "delta"],
+          forbiddenPatterns: ["line up", "cleared for takeoff"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Entering a runway without clearance is stopped",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      {
+        position: positions.crossingRunway,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["hold position"],
+          forbiddenPatterns: ["cleared"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Taxi to parking after landing",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      clearedToLand,
+      { position: positions.smoothFlare },
+      { position: positions.landingRoll },
+      {
+        position: positions.clearOfRunway,
+        pilot: "Ground, LV-INQ, clear of the runway, request taxi to parking.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["taxi to ramp 1", "charlie"],
+          forbiddenPatterns: ["hold short", "runway"],
+        },
+      },
+    ],
+  },
+
   /* ===================================================================== */
   /* DEPARTURE                                                             */
   /* ===================================================================== */

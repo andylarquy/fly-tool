@@ -129,7 +129,32 @@ async function runScenarioOnce(
   };
 }
 
+const argumentValue = (flag: string): string | undefined => {
+  const index = process.argv.indexOf(flag);
+
+  return index === -1 ? undefined : process.argv[index + 1]?.toLowerCase();
+};
+
+const selectScenarios = (): { selected: BenchmarkScenario[]; filter?: string } => {
+  const section = argumentValue("--section");
+  const name = argumentValue("--scenario");
+
+  const selected = scenarios.filter(
+    (scenario) =>
+      (!section || scenario.section.toLowerCase() === section) &&
+      (!name || scenario.name.toLowerCase().includes(name)),
+  );
+
+  if (selected.length === 0) {
+    throw new Error("No scenario matches --section / --scenario");
+  }
+
+  return { selected, filter: section ?? name };
+};
+
 async function runBenchmark(): Promise<void> {
+  const { selected, filter } = selectScenarios();
+
   const runway = labAirport.runways.find((r) => r.designator === ACTIVE_RUNWAY);
 
   if (!runway) {
@@ -140,7 +165,7 @@ async function runBenchmark(): Promise<void> {
 
   const results: ScenarioResult[] = [];
 
-  for (const scenario of scenarios) {
+  for (const scenario of selected) {
     console.log(`\n=== ${scenario.name} ===`);
 
     const runs: BenchmarkRun[] = [];
@@ -153,7 +178,7 @@ async function runBenchmark(): Promise<void> {
     results.push({ scenario, runs });
   }
 
-  const filePath = saveMarkdownReport(buildMarkdownReport(results));
+  const filePath = saveMarkdownReport(buildMarkdownReport(results), filter);
   console.log(`\nSaved markdown report: ${filePath}`);
 }
 
