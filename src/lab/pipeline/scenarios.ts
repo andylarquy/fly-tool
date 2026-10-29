@@ -9,7 +9,7 @@ export interface PipelineStep {
 
 export interface PipelineScenario {
   name: string;
-  origin: "benchmark" | "new";
+  origin: "benchmark" | "adapted" | "new";
   steps: PipelineStep[];
 }
 
@@ -72,7 +72,7 @@ export const pipelineScenarios: PipelineScenario[] = [
   },
   {
     name: "Completed instruction should not be repeated",
-    origin: "benchmark",
+    origin: "adapted",
     steps: [
       ...takeoffFlow,
       {
@@ -83,20 +83,23 @@ export const pipelineScenarios: PipelineScenario[] = [
       {
         position: positions.downwind,
         pilot: "Downwind at 1000 feet, LV-INQ.",
-        expect: { responseRequired: false, forbiddenPatterns: ["climb and maintain", "climb to"] },
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["report base"],
+          forbiddenPatterns: ["climb and maintain", "climb to"],
+        },
       },
     ],
   },
   {
     name: "Crosswind position report",
-    origin: "benchmark",
+    origin: "adapted",
     steps: [
       {
         position: positions.crosswind,
         pilot: "Tower, turning crosswind, LV-INQ.",
         expect: {
-          responseRequired: true,
-          requiredConcepts: ["1000"],
+          responseRequired: false,
           forbiddenPatterns: ["cleared for takeoff", "cleared to land"],
         },
       },
@@ -196,15 +199,57 @@ export const pipelineScenarios: PipelineScenario[] = [
   },
   {
     name: "Emergency declaration takes priority",
-    origin: "benchmark",
+    origin: "adapted",
     steps: [
       {
         position: positions.upwind,
         pilot: "MAYDAY MAYDAY MAYDAY, LV-INQ, engine failure, 700 feet.",
         expect: {
           responseRequired: true,
-          requiredConcepts: ["engine"],
-          forbiddenPatterns: ["report downwind", "report base", "report final", "cleared for takeoff"],
+          requiredConcepts: ["mayday", "engine failure", "intentions"],
+          forbiddenPatterns: ["nature of", "report downwind", "report base", "report final", "cleared for takeoff"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Emergency: details are remembered and the rest is asked when it fits",
+    origin: "new",
+    steps: [
+      {
+        position: positions.upwind,
+        pilot: "MAYDAY MAYDAY MAYDAY, LV-INQ, engine failure, 700 feet.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["engine failure", "intentions"],
+          forbiddenPatterns: ["nature of", "souls", "fuel"],
+        },
+      },
+      {
+        position: positions.upwind,
+        pilot: "Returning to the field, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["mayday"],
+          forbiddenPatterns: ["say", "intentions", "nature of", "souls", "fuel"],
+        },
+      },
+      {
+        position: positions.downwind,
+        pilot: "Three souls on board, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["fuel"],
+          forbiddenPatterns: ["souls on board", "intentions", "nature of"],
+        },
+      },
+      {
+        position: positions.base,
+        pilot: "Forty minutes of fuel, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["cleared to land", "23"],
+          forbiddenPatterns: ["say", "intentions"],
         },
       },
     ],
