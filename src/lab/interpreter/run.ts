@@ -1,8 +1,10 @@
 import { extractEmergencyDetails } from "../../ai/interpreter/emergencyDetailsExtractor";
+import { verifyTaxiReadback } from "../../ai/interpreter/taxiReadbackVerifier";
 import { classifyPilotMessage } from "../../ai/interpreter/pilotMessageClassifier";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { MODEL } from "../../ai/modelConfig";
 import { labAirport } from "../airports";
+import { readbackSamples } from "./readbackSamples";
 import { samples } from "./samples";
 
 const RUNS_PER_SAMPLE = 1;
@@ -137,7 +139,71 @@ async function runClassification(): Promise<void> {
     .forEach(([key, count]) => console.log(`  ${key}: ${count}`));
 }
 
-runClassification().catch((error: unknown) => {
-  console.error("Classification failed:", error);
+async function runReadbackVerification(): Promise<void> {
+  console.log("\n=== Taxi readback verifier ===");
+
+  const fields = { readsBack: 0, holdShortRepeated: 0, taxiwaysRepeated: 0, mentionsOtherTaxiway: 0 };
+  let invalid = 0;
+  const latencies: number[] = [];
+
+  for (const sample of readbackSamples) {
+    const start = performance.now();
+    const got = await verifyTaxiReadback({
+      transcript: sample.transcript,
+      legs: sample.taxiways.map((name) => ({ kind: "taxiway", name })),
+      holdShort: sample.holdShort,
+      callsign: "LV-INQ",
+      destination: sample.destination ?? (sample.holdShort ? `runway ${sample.holdShort}` : undefined),
+      knownNonTaxiways: [sample.holdShort, sample.destination].filter(
+        (text): text is string => text !== undefined,
+      ),
+    });
+    latencies.push(performance.now() - start);
+
+    if (!got) {
+      invalid++;
+      console.log(`INVALID "${sample.transcript}"`);
+      continue;
+    }
+
+    const want = sample.expected;
+    const sameSet = (a: string[], b: string[]) => [...a].sort().join() === [...b].sort().join();
+    const correct = {
+      readsBack: got.readsBack === want.readsBack,
+      holdShortRepeated: got.holdShortRepeated === want.holdShortRepeated,
+      taxiwaysRepeated: sameSet(got.taxiwaysRepeated, want.taxiwaysRepeated),
+      mentionsOtherTaxiway: got.mentionsOtherTaxiway === want.mentionsOtherTaxiway,
+    };
+
+    (Object.keys(fields) as (keyof typeof fields)[]).forEach((key) => {
+      fields[key] += correct[key] ? 1 : 0;
+    });
+
+    if (Object.values(correct).some((ok) => !ok)) {
+      console.log(`DIFF "${sample.transcript}"`);
+      console.log(`     expected: ${JSON.stringify(want)}`);
+      console.log(`     got:      ${JSON.stringify(got)}`);
+    }
+  }
+
+  const total = readbackSamples.length;
+  console.log("");
+  (Object.keys(fields) as (keyof typeof fields)[]).forEach((key) =>
+    console.log(`${key}: ${percent(fields[key], total)}`),
+  );
+  console.log(`Invalid output: ${invalid}`);
+  console.log(`Median latency: ${(median(latencies) / 1000).toFixed(2)} s`);
+}
+
+async function main(): Promise<void> {
+  if (!process.argv.includes("--verifier")) {
+    await runClassification();
+  }
+
+  await runReadbackVerification();
+}
+
+main().catch((error: unknown) => {
+  console.error("Interpreter lab failed:", error);
   process.exitCode = 1;
 });

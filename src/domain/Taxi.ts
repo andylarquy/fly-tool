@@ -23,4 +23,5 @@ export interface TaxiState {
   offRouteSinceMs?: number;
   lastCorrectionAtMs?: number;
   lastIncursionAtMs?: number;
+  readbackRejections?: number;
 }

@@ -11,7 +11,6 @@ import {
   withStatus,
 } from "./clearances";
 import { decideEmergency, hasEmergencyDetails } from "./decideEmergency";
-import { checkTaxiReadback } from "./taxiReadback";
 import {
   decideTaxiRequest,
   isOnTaxiNetwork,
@@ -26,6 +25,7 @@ import {
 } from "./pattern";
 import { Decision, DecisionContext } from "./decisionTypes";
 
+const MAX_READBACK_REJECTIONS = 2;
 const LANDING_KINDS = ["land" as const, "touch_and_go" as const];
 
 const runwayOf = ({ airport }: DecisionContext, state: EngineState): Runway => {
@@ -146,28 +146,44 @@ const decideRequest = (
 // How much of a taxi readback has to be right depends on the controller: a
 // strict one wants the whole route and the hold-short back, a normal one the
 // hold-short and no wrong names, a relaxed one only the right runway (a wrong
-// turn is still caught later by the progress check).
+// turn is still caught later by the progress check). What the pilot actually
+// said was judged by the model; this only applies the tier.
 const checkTaxiFidelity = (
-  { style, callsign }: DecisionContext,
+  { style }: DecisionContext,
   state: EngineState,
   message: PilotMessage,
 ): Decision | undefined => {
   const taxi = state.taxi;
+  const heard = message.taxiReadback;
 
-  if (!taxi || !message.transcript || style.strictness === "relaxed") {
+  if (!taxi || !heard || style.strictness === "relaxed") {
     return undefined;
   }
 
-  const heard = checkTaxiReadback(message.transcript, taxi.legs, taxi.holdShort, callsign);
+  // The model's judgement can be wrong, and at temperature 0 the same words
+  // would be rejected again, so one instruction is only rejected so many times.
+  const rejections = taxi.readbackRejections ?? 0;
 
-  if (heard.unexpected.length > 0) {
-    return repeatTaxiInstruction(state, "readback_error");
+  if (rejections >= MAX_READBACK_REJECTIONS) {
+    return undefined;
   }
 
-  const incomplete =
-    !heard.holdShortHeard || (style.strictness === "strict" && heard.missing.length > 0);
+  const counted: EngineState = {
+    ...state,
+    taxi: { ...taxi, readbackRejections: rejections + 1 },
+  };
 
-  return incomplete ? ask("full_readback", state) : undefined;
+  if (heard.mentionsOtherTaxiway) {
+    return repeatTaxiInstruction(counted, "readback_error");
+  }
+
+  const expected = taxi.legs.flatMap((leg) => (leg.kind === "taxiway" ? [leg.name] : []));
+  const missing = expected.filter((name) => !heard.taxiwaysRepeated.includes(name));
+  const lacksHoldShort = taxi.holdShort !== undefined && !heard.holdShortRepeated;
+
+  return lacksHoldShort || (style.strictness === "strict" && missing.length > 0)
+    ? ask("full_readback", counted)
+    : undefined;
 };
 
 const decideReadback = (
@@ -294,16 +310,13 @@ const decideQuestion = (
   }
 };
 
-const REQUEST_WORDS = /\b(request|requesting|solicito|solicitamos|ready)\b/i;
-
-// A taxi call that arrives while a taxi instruction still waits for its
-// readback, and does not ask for anything, is the readback.
-const readBackAsRequest = (state: EngineState, message: PilotMessage): boolean =>
-  message.type === "request" &&
-  (message.subject === "taxi" || message.subject === "parking") &&
-  findPendingReadback(state)?.kind === "taxi" &&
-  message.transcript !== undefined &&
-  !REQUEST_WORDS.test(message.transcript);
+// A reply the model judged to be repeating the pending taxi instruction is its
+// readback, whatever the classifier labeled it (the small model often labels a
+// short readback a request).
+const isTaxiReadback = (state: EngineState, message: PilotMessage): boolean =>
+  message.taxiReadback?.readsBack === true &&
+  (message.type === "request" || message.type === "other") &&
+  findPendingReadback(state)?.kind === "taxi";
 
 export const decidePilotMessage = (
   ctx: DecisionContext,
@@ -311,7 +324,7 @@ export const decidePilotMessage = (
   heard: PilotMessage,
 ): Decision => {
   const state = { ...previous, contacted: true };
-  const message: PilotMessage = readBackAsRequest(state, heard)
+  const message: PilotMessage = isTaxiReadback(state, heard)
     ? { ...heard, type: "readback" }
     : heard;
 

@@ -24,7 +24,6 @@ export interface DecisionContext {
   situation: Situation;
   style: ControllerStyle;
   memory?: DecisionMemory;
-  callsign?: string;
 }
 
 export interface DecisionInput extends DecisionContext {

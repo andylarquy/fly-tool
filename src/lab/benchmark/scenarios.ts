@@ -172,7 +172,7 @@ export const scenarios: BenchmarkScenario[] = [
       requestTaxi,
       {
         position: positions.rampSpot,
-        pilot: "Taxi to runway 23, LV-INQ.",
+        pilot: "Charlie, Alpha, Bravo, LV-INQ.",
         expect: silent,
       },
     ],

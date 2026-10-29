@@ -6,13 +6,12 @@ import {
 import { Airport } from "../../domain/Airport";
 import { Strictness } from "../../domain/ControllerStyle";
 import { FlightPhase } from "../../domain/FlightPhase";
-import { PilotMessage } from "../../domain/PilotMessage";
+import { PilotMessage, TaxiReadbackJudgement } from "../../domain/PilotMessage";
 import { Situation } from "../../domain/Situation";
 import { TaxiLeg } from "../../domain/Taxi";
 import { TaxiNetwork } from "../../domain/TaxiNetwork";
 import { decide } from "../../engine/decide";
 import { createEngineState } from "../../engine/engineState";
-import { checkTaxiReadback } from "../../engine/taxiReadback";
 import { deriveSituation } from "../../situation/deriveSituation";
 import {
   distanceToRouteFeet,
@@ -154,46 +153,6 @@ function runRunways(): void {
   );
 }
 
-const named = (...names: string[]): TaxiLeg[] =>
-  names.map((name) => ({ kind: "taxiway", name }));
-
-function runReadbackMatching(): void {
-  const cab = named("C", "A", "B");
-  const heard = (text: string, legs = cab) =>
-    checkTaxiReadback(text, legs, "23", "LV-INQ");
-  const summary = (c: ReturnType<typeof heard>) =>
-    `hold=${c.holdShortHeard} missing=[${c.missing}] unexpected=[${c.unexpected}]`;
-
-  const full = heard("Taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23, LV-INQ.");
-  check("A complete readback has nothing missing", full.holdShortHeard && full.missing.length === 0 && full.unexpected.length === 0, summary(full));
-
-  const lacksAlpha = heard("Taxi via Charlie, Bravo, hold short runway 23, LV-INQ.");
-  check("A skipped taxiway is reported missing", lacksAlpha.missing.join() === "A" && lacksAlpha.unexpected.length === 0, summary(lacksAlpha));
-
-  check("A readback without hold short is noticed", !heard("Taxi via Charlie, Alpha, Bravo, LV-INQ.").holdShortHeard);
-  check("'Holding short' counts as hold short", heard("Holding short runway 23, via Charlie, Alpha, Bravo").holdShortHeard);
-
-  const wrong = heard("Taxi via Charlie, Delta, Bravo, hold short runway 23.");
-  check("A taxiway that is not on the route is unexpected", wrong.unexpected.join() === "delta" && wrong.missing.join() === "A", summary(wrong));
-
-  const alfa = heard("Taxi via Charlie, Alfa, Bravo, hold short runway 23.");
-  check("Alfa is Alpha", alfa.missing.length === 0 && alfa.unexpected.length === 0, summary(alfa));
-
-  const letters = heard("Taxi via C A B, hold short runway 23.");
-  check("Bare letters are accepted for single-letter taxiways", letters.missing.length === 0, summary(letters));
-
-  const numbered = named("A1");
-  check("A numbered taxiway is heard as Alpha one or Alpha 1", heard("via Alpha one", numbered).missing.length === 0 && heard("via alpha 1", numbered).missing.length === 0);
-  check("Half of a numbered taxiway is missing", heard("via Alpha", numbered).missing.join() === "A1");
-
-  const phoneticCallsign = heard("Taxi via Charlie, Alpha, Bravo, hold short runway 23, Lima Victor India November Quebec");
-  check("A phonetic callsign is not taken for a taxiway", phoneticCallsign.unexpected.length === 0, summary(phoneticCallsign));
-
-  check("Taxiways out of order count as missing", heard("via Alpha, Charlie, Bravo, hold short").missing.join() === "A");
-  check("Hold short is not required when there is none", checkTaxiReadback("via Charlie, Alpha, Bravo", cab, undefined, "LV-INQ").holdShortHeard);
-  check("A taxiway named with a word is matched as a word", checkTaxiReadback("via apron", named("Apron"), undefined, "LV-INQ").missing.length === 0);
-}
-
 function runFacilityConversion(): void {
   const network = buildTaxiNetwork(labFacilityData, labAirport.runways);
   const byId = (id: number) => network.points.find((p) => p.id === id)!;
@@ -294,21 +253,30 @@ const requestFromRamp: Step = {
   expect: [taxiToRunway23],
 };
 
+const judged = (overrides: Partial<TaxiReadbackJudgement> = {}): TaxiReadbackJudgement => ({
+  readsBack: true,
+  holdShortRepeated: true,
+  taxiwaysRepeated: ["C", "A", "B"],
+  mentionsOtherTaxiway: false,
+  ...overrides,
+});
+
 const readback = (
-  transcript: string,
+  judgement: TaxiReadbackJudgement,
   expect: string[],
   runway: string | null = "23",
   subject: PilotMessage["subject"] = "taxi",
 ): Step => ({
   position: A.rampSpot,
-  pilot: { ...msg("readback", runway, subject), transcript },
+  pilot: { ...msg("readback", runway, subject), taxiReadback: judgement },
   expect,
 });
 
-const COMPLETE = "Taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23, LV-INQ.";
-const NO_HOLD_SHORT = "Taxi to runway 23 via Charlie, Alpha, Bravo, LV-INQ.";
-const NO_ALPHA = "Taxi to runway 23 via Charlie, Bravo, hold short runway 23, LV-INQ.";
-const WRONG_TAXIWAY = "Taxi to runway 23 via Charlie, Delta, Bravo, hold short runway 23, LV-INQ.";
+const COMPLETE = judged();
+const NO_HOLD_SHORT = judged({ holdShortRepeated: false });
+const NO_ALPHA = judged({ taxiwaysRepeated: ["C", "B"] });
+const WRONG_TAXIWAY = judged({ taxiwaysRepeated: ["C", "B"], mentionsOtherTaxiway: true });
+const BARE_ROGER = judged({ holdShortRepeated: false, taxiwaysRepeated: [] });
 const REPEAT_ROUTE = "taxi_instruction:readback_error:runway 23:C+A+B:hold 23";
 
 const scenarios: Scenario[] = [
@@ -369,7 +337,25 @@ const scenarios: Scenario[] = [
   },
   {
     name: "Normal: a bare roger to a taxi instruction is not enough",
-    steps: [requestFromRamp, readback("Roger, LV-INQ.", ["query:full_readback"], null, "other")],
+    steps: [requestFromRamp, readback(BARE_ROGER, ["query:full_readback"], null, "other")],
+  },
+  {
+    name: "A readback the model keeps rejecting is accepted the third time",
+    steps: [
+      requestFromRamp,
+      readback(NO_HOLD_SHORT, ["query:full_readback"]),
+      readback(NO_HOLD_SHORT, ["query:full_readback"]),
+      readback(NO_HOLD_SHORT, []),
+    ],
+  },
+  {
+    name: "A fresh instruction starts the count again",
+    steps: [
+      requestFromRamp,
+      readback(NO_HOLD_SHORT, ["query:full_readback"]),
+      readback(NO_HOLD_SHORT, ["query:full_readback"]),
+      { position: A.rampSpot, pilot: msg("question", null, "taxi"), expect: ["taxi_instruction:repeat:runway 23:C+A+B:hold 23"] },
+    ],
   },
   {
     name: "Normal: a wrong taxiway is corrected with the route",
@@ -378,7 +364,7 @@ const scenarios: Scenario[] = [
   {
     name: "Relaxed: a sloppy readback is accepted",
     strictness: "relaxed",
-    steps: [requestFromRamp, readback("Roger, LV-INQ.", [], null, "other")],
+    steps: [requestFromRamp, readback(BARE_ROGER, [], null, "other")],
   },
   {
     name: "Relaxed: even a wrong taxiway is left for the progress check",
@@ -390,11 +376,11 @@ const scenarios: Scenario[] = [
     strictness: "relaxed",
     steps: [
       requestFromRamp,
-      readback("Taxi to runway 05 via Charlie, Alpha, Bravo, hold short runway 05, LV-INQ.", [REPEAT_ROUTE], "05"),
+      readback(COMPLETE, [REPEAT_ROUTE], "05"),
     ],
   },
   {
-    name: "Without a transcript the readback is judged on its labels only",
+    name: "Without a judgement the readback is judged on its labels only",
     strictness: "strict",
     steps: [
       requestFromRamp,
@@ -402,13 +388,13 @@ const scenarios: Scenario[] = [
     ],
   },
   {
-    name: "Relaxed: a taxi call after the instruction that asks for nothing is its readback",
+    name: "Relaxed: a call the model judged to be the readback is treated as one",
     strictness: "relaxed",
     steps: [
       requestFromRamp,
       {
         position: A.rampSpot,
-        pilot: { ...msg("request", "23", "taxi"), transcript: "Taxi to runway 23, LV-INQ." },
+        pilot: { ...msg("request", "23", "taxi"), taxiReadback: BARE_ROGER },
         expect: [],
       },
     ],
@@ -419,18 +405,18 @@ const scenarios: Scenario[] = [
       requestFromRamp,
       {
         position: A.rampSpot,
-        pilot: { ...msg("request", "23", "taxi"), transcript: "Taxi to runway 23, LV-INQ." },
+        pilot: { ...msg("request", "23", "taxi"), taxiReadback: BARE_ROGER },
         expect: ["query:full_readback"],
       },
     ],
   },
   {
-    name: "A taxi call that does ask for taxi is still a request",
+    name: "A call the model judged not to be a readback stays a request",
     steps: [
       requestFromRamp,
       {
         position: A.rampSpot,
-        pilot: { ...msg("request", "23", "taxi"), transcript: "Ground, request taxi to runway 23, LV-INQ." },
+        pilot: { ...msg("request", "23", "taxi"), taxiReadback: judged({ readsBack: false }) },
         expect: ["taxi_instruction:repeat:runway 23:C+A+B:hold 23"],
       },
     ],
@@ -569,7 +555,6 @@ function runScenarios(): void {
           airport,
           situation,
           style: { strictness: scenario.strictness ?? "normal" },
-          callsign: "LV-INQ",
           events: derived.events,
           pilot: pilot ? { status: "heard", message: pilot } : { status: "none" },
         },
@@ -604,7 +589,6 @@ function runScenarios(): void {
 
 runRouting();
 runRunways();
-runReadbackMatching();
 runFacilityConversion();
 runScenarios();
 

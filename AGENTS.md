@@ -70,7 +70,9 @@ doesn't have real situational grounding yet.
   Ollama structured output, and prints type/runway/subject accuracy plus a
   confusion summary. Samples that carry emergency details also run
   `extractEmergencyDetails` and check every field, including ones that must
-  stay empty. Not wired into the live app.
+  stay empty. It then evaluates the taxi readback verifier on labeled
+  replies (`interpreter/readbackSamples.ts`, English and Spanish);
+  `npm run lab:interpreter -- --verifier` runs just that part. Not wired into the live app.
 - `npm run lab:engine` — build + run `src/lab/engine/engine.js`.
   Deterministic (no Ollama): replays scripted pilot messages/phases/events
   through `decide` and checks the resulting `AtcIntent` labels per step.
@@ -178,20 +180,19 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   handoff belongs there); moving >120 ft off the route for 4 s re-plans from
   the current point and issues `off_route` (30 s cooldown); being on a runway
   in the `Taxiing` phase with no runway clearance gives `hold_position`
-  (20 s cooldown). Taxi readback fidelity (`taxiReadback.ts`): the pipeline
-  attaches the raw transcript to the classified message, and the engine
-  checks it against the route it issued (no model: it knows the answer, so it
-  looks for the expected phonetic names in order, accepts "Alfa"/"Alpha one"/bare
-  letters, ignores the pilot's own callsign even when spoken phonetically, and
-  flags phonetic words that are not on the route). A wrong runway is corrected
-  at every strictness; beyond that: strict wants the hold-short phrase and the
-  whole route ("say again, full readback" when incomplete), normal wants the
-  hold-short and no wrong names, relaxed accepts anything (a wrong turn is
-  caught later by the progress check). English only for now. Two guards around
-  it: a "say again" does not replace the instruction the pilot reads back
-  against in the classifier's context, and a taxi call that arrives while the
-  instruction awaits its readback and does not say "request" is read as the
-  readback (the 4B model often labels it a request). Runway crossings: a runway other than the active one is
+  (20 s cooldown). Taxi readback fidelity: while a taxi instruction waits for its readback,
+  the pipeline makes one extra model call (`verifyTaxiReadback`, see
+  `ai/interpreter/`) that compares the pilot's words with the instruction and
+  attaches a `TaxiReadbackJudgement` to the message. The engine applies the
+  strictness tier to it and contains no words of any language. A wrong runway
+  is corrected at every strictness; beyond that: strict wants the hold-short
+  and the whole route ("say again, full readback" when incomplete), normal
+  wants the hold-short and no wrong names, relaxed accepts anything (a wrong
+  turn is caught later by the progress check). One instruction is rejected at
+  most `MAX_READBACK_REJECTIONS` (2) times: the judgement can be wrong and the
+  same words would be rejected again at temperature 0. A reply the model
+  judges to be repeating the instruction is treated as its readback even if
+  the classifier labeled it a request. Runway crossings:Runway crossings: a runway other than the active one is
   crossed as part of the route ("via Golf, cross runway 13, Golf"). The
   *active* runway never is: the first instruction ends with "hold short
   runway 23", and when the pilot is stationary at that point with no runway
@@ -224,8 +225,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   keeps the live record in `PipelineState`; the *caller* decides when to
   `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
-- `src/utils/phonetic.ts` — the phonetic alphabet (and its spelling variants), used
-  both to speak taxiways and to recognise them in a readback.
+- `src/utils/phonetic.ts` — the phonetic alphabet, used only to *speak* taxiways
+  (and callsigns). Understanding what the pilot said is the model's job, not a
+  word list's.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
   `msfs2024/taxiFacility.ts` is the pure half of reading an airport's taxi
   data: `buildTaxiNetwork` turns decoded `TAXI_POINT`/`TAXI_PATH`/`TAXI_NAME`/
@@ -256,6 +258,15 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       when the message is an emergency or one is already active. Kept out of
       the main classifier because folding these fields in raised its median
       latency from ~0.65 s to ~1.8 s and lowered type accuracy.
+    - `taxiReadbackVerifier.ts` / `taxiReadbackPrompt.ts` — compares a pilot's
+      reply with the pending taxi instruction (any language). It asks for
+      evidence, not just verdicts: a quote for the hold-short and, per taxiway
+      the pilot said, the words used plus which expected taxiway (or "other")
+      they match; code keeps a quote only if it really occurs in the transcript
+      (a plain substring test), and drops "other" mentions that are really the
+      destination, a runway, or the callsign (known from our own data). Yes/no
+      judgements alone were loose enough to give false "wrong taxiway" alarms.
+      A call on a rare path (only during a pending taxi readback), ~1.8 s.
     - `modelOutputParsing.ts` — small shared helpers for validating model
       output.
   - `renderer/` — `AtcIntent[]` -> the controller's words (ATC side).

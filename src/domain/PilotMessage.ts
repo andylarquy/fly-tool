@@ -32,10 +32,20 @@ import { EmergencyDetails } from "./Emergency";
 export type PilotMessageType = (typeof PILOT_MESSAGE_TYPES)[number];
 export type PilotMessageSubject = (typeof PILOT_MESSAGE_SUBJECTS)[number];
 
+// What the model made of a pilot's reply to a taxi instruction, compared with
+// the instruction itself. Only present while such an instruction is waiting
+// for its readback.
+export interface TaxiReadbackJudgement {
+  readsBack: boolean;
+  holdShortRepeated: boolean;
+  taxiwaysRepeated: string[];
+  mentionsOtherTaxiway: boolean;
+}
+
 export interface PilotMessage {
   type: PilotMessageType;
   runway: string | null;
   subject: PilotMessageSubject;
   emergency?: EmergencyDetails;
-  transcript?: string;
+  taxiReadback?: TaxiReadbackJudgement;
 }

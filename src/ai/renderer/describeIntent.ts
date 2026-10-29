@@ -1,5 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
-import { spokenLetter } from "../../utils/phonetic";
+import { spokenTaxiway } from "../../utils/phonetic";
 import { TaxiDestination, TaxiInstructionReason, TaxiLeg } from "../../domain/Taxi";
 import {
   EmergencyNature,
@@ -12,17 +12,6 @@ const fields = (entries: [string, string | number | boolean | undefined][]): str
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${value}`)
     .join(" | ");
-
-const SPELLED_TAXIWAY = /^[A-Za-z]{1,2}\d{0,2}$/;
-
-// "A1" is spelled out ("Alpha 1"); a name such as "Apron" is already a word.
-export const spokenTaxiway = (name: string): string =>
-  SPELLED_TAXIWAY.test(name)
-    ? name
-        .split("")
-        .map((character) => spokenLetter(character) ?? character)
-        .join(" ")
-    : name;
 
 const TAXI_LEAD_IN: Partial<Record<TaxiInstructionReason, string>> = {
   readback_error: "Negative.",

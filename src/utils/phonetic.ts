@@ -1,38 +1,21 @@
-export const PHONETIC_WORDS: Record<string, string[]> = {
-  A: ["alpha", "alfa"],
-  B: ["bravo"],
-  C: ["charlie"],
-  D: ["delta"],
-  E: ["echo"],
-  F: ["foxtrot"],
-  G: ["golf"],
-  H: ["hotel"],
-  I: ["india"],
-  J: ["juliett", "juliet"],
-  K: ["kilo"],
-  L: ["lima"],
-  M: ["mike"],
-  N: ["november"],
-  O: ["oscar"],
-  P: ["papa"],
-  Q: ["quebec"],
-  R: ["romeo"],
-  S: ["sierra"],
-  T: ["tango"],
-  U: ["uniform"],
-  V: ["victor"],
-  W: ["whiskey", "whisky"],
-  X: ["xray"],
-  Y: ["yankee"],
-  Z: ["zulu"],
+const PHONETIC_WORD: Record<string, string> = {
+  A: "Alpha", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo", F: "Foxtrot",
+  G: "Golf", H: "Hotel", I: "India", J: "Juliett", K: "Kilo", L: "Lima",
+  M: "Mike", N: "November", O: "Oscar", P: "Papa", Q: "Quebec", R: "Romeo",
+  S: "Sierra", T: "Tango", U: "Uniform", V: "Victor", W: "Whiskey",
+  X: "X-ray", Y: "Yankee", Z: "Zulu",
 };
 
-export const DIGIT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const SPELLED_TAXIWAY = /^[A-Za-z]{1,2}\d{0,2}$/;
 
-const capitalized = (word: string): string => word[0].toUpperCase() + word.slice(1);
+export const spokenLetter = (letter: string): string | undefined =>
+  PHONETIC_WORD[letter.toUpperCase()];
 
-export const spokenLetter = (letter: string): string | undefined => {
-  const word = PHONETIC_WORDS[letter.toUpperCase()]?.[0];
-
-  return word && (word === "xray" ? "X-ray" : capitalized(word));
-};
+// "A1" is spelled out ("Alpha 1"); a name such as "Apron" is already a word.
+export const spokenTaxiway = (name: string): string =>
+  SPELLED_TAXIWAY.test(name)
+    ? name
+        .split("")
+        .map((character) => spokenLetter(character) ?? character)
+        .join(" ")
+    : name;

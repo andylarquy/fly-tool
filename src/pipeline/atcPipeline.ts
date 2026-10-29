@@ -1,3 +1,5 @@
+import { verifyTaxiReadback } from "../ai/interpreter/taxiReadbackVerifier";
+import { findPendingReadback } from "../engine/clearances";
 import { extractEmergencyDetails } from "../ai/interpreter/emergencyDetailsExtractor";
 import { classifyPilotMessage } from "../ai/interpreter/pilotMessageClassifier";
 import { renderTransmission } from "../ai/renderer/intentRenderer";
@@ -42,6 +44,7 @@ export interface PipelineInput {
 export interface StageTimings {
   classifyMs: number;
   extractMs: number;
+  verifyMs: number;
   renderMs: number;
 }
 
@@ -110,7 +113,7 @@ export const runPipelineTurn = async (
 
   let pilot: PilotInput = { status: "none" };
   let message: PilotMessage | undefined;
-  const timings: StageTimings = { classifyMs: 0, extractMs: 0, renderMs: 0 };
+  const timings: StageTimings = { classifyMs: 0, extractMs: 0, verifyMs: 0, renderMs: 0 };
 
   if (pilotTransmission) {
     const classifyStart = performance.now();
@@ -121,16 +124,40 @@ export const runPipelineTurn = async (
     });
 
     timings.classifyMs = performance.now() - classifyStart;
-    message = classification.message && {
-      ...classification.message,
-      transcript: pilotTransmission,
-    };
+    message = classification.message;
 
     if (message && (message.type === "emergency" || previous.engine.emergency)) {
       const extractStart = performance.now();
       const emergency = await extractEmergencyDetails(pilotTransmission);
       timings.extractMs = performance.now() - extractStart;
       message = { ...message, emergency };
+    }
+
+    const taxi = previous.engine.taxi;
+
+    if (
+      message &&
+      taxi &&
+      findPendingReadback(previous.engine)?.kind === "taxi" &&
+      ["request", "readback", "other"].includes(message.type)
+    ) {
+      const verifyStart = performance.now();
+      const taxiReadback = await verifyTaxiReadback({
+        transcript: pilotTransmission,
+        legs: taxi.legs,
+        holdShort: taxi.holdShort,
+        callsign,
+        destination:
+          taxi.destination.kind === "runway"
+            ? `runway ${taxi.destination.runway}`
+            : taxi.destination.name,
+        knownNonTaxiways: [
+          taxi.holdShort,
+          taxi.destination.kind === "runway" ? taxi.destination.runway : taxi.destination.name,
+        ].filter((text): text is string => text !== undefined),
+      });
+      timings.verifyMs = performance.now() - verifyStart;
+      message = { ...message, taxiReadback };
     }
 
     pilot = message
@@ -147,7 +174,6 @@ export const runPipelineTurn = async (
       events,
       pilot,
       memory: { history, epochMs },
-      callsign,
     },
     previous.engine,
   );
