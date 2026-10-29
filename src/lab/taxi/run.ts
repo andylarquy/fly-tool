@@ -1,16 +1,24 @@
-import { createEngineState } from "../../engine/engineState";
-import { decide } from "../../engine/decide";
+import { Airport } from "../../domain/Airport";
 import { FlightPhase } from "../../domain/FlightPhase";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { Situation } from "../../domain/Situation";
+import { TaxiLeg } from "../../domain/Taxi";
+import { TaxiNetwork } from "../../domain/TaxiNetwork";
+import { decide } from "../../engine/decide";
+import { createEngineState } from "../../engine/engineState";
 import { deriveSituation } from "../../situation/deriveSituation";
 import {
   distanceToRouteFeet,
+  firstCrossingOf,
   holdingShortRunway,
+  holdShortPointFor,
+  isOnNetwork,
   nearestParking,
-  nearestPoint,
   planRoute,
+  planRouteFrom,
+  sameRunway,
 } from "../../taxi/routing";
+import { pointFromRunwayFrame } from "../../utils/geo";
 import { labAirport, labTaxiNetwork } from "../airports";
 import { positions, RunwayFrameSpec, telemetryAt } from "../benchmark/telemetry";
 import { label, msg } from "../engine/helpers";
@@ -32,9 +40,34 @@ const check = (name: string, ok: boolean, detail = ""): void => {
 const at = (spec: RunwayFrameSpec) =>
   telemetryAt(runway23, labAirport.elevationFeet, spec);
 
+const inFrame = (alongFeet: number, crossFeet: number) =>
+  pointFromRunwayFrame(runway23.threshold, runway23.trueHeading, alongFeet, crossFeet);
+
+const spell = (legs: TaxiLeg[] | undefined): string | undefined =>
+  legs?.map((leg) => (leg.kind === "taxiway" ? leg.name : `x${leg.runway}`)).join("+");
+
+// A second, crossing runway "13" on the way to Ramp 2, to test crossings
+// that are cleared as part of the route.
+const crossRunwayNetwork: TaxiNetwork = {
+  ...labTaxiNetwork,
+  points: [
+    ...labTaxiNetwork.points,
+    { id: 20, position: inFrame(2800, 700) },
+    { id: 21, position: inFrame(2800, 800) },
+  ],
+  segments: [
+    ...labTaxiNetwork.segments.filter((s) => !(s.from === 9 && s.to === 10)),
+    { from: 9, to: 20, taxiway: "G" },
+    { from: 20, to: 21, crossesRunway: "13" },
+    { from: 21, to: 10, taxiway: "G" },
+  ],
+};
+
+const crossRunwayAirport: Airport = { ...labAirport, taxi: crossRunwayNetwork };
+
 function runRouting(): void {
   const route = (from: number, to: number) => planRoute(labTaxiNetwork, from, to);
-  const names = (from: number, to: number) => route(from, to)?.taxiways.join("+");
+  const names = (from: number, to: number) => spell(route(from, to)?.legs);
 
   check("Ramp 1 to runway 23 goes via C, A, B", names(0, 5) === "C+A+B", names(0, 5));
   check("Ramp 1 to runway 05 goes via C, A, D", names(0, 8) === "C+A+D", names(0, 8));
@@ -47,10 +80,13 @@ function runRouting(): void {
   };
   check("An unreachable point has no route", planRoute(island, 0, 99) === undefined);
 
-  const center = labAirport.position;
   check(
-    "An aircraft far from every taxi point is not on the network",
-    nearestPoint(labTaxiNetwork, center) === undefined,
+    "An aircraft far from every taxi segment is not on the network",
+    !isOnNetwork(labTaxiNetwork, at(positions.offTheNetwork)),
+  );
+  check(
+    "An aircraft in the middle of a long segment is on the network",
+    isOnNetwork(labTaxiNetwork, at(positions.taxiingOnAlpha)),
   );
   check(
     "The hold line of runway 23 is recognised",
@@ -69,6 +105,45 @@ function runRouting(): void {
   const offRoute = distanceToRouteFeet(labTaxiNetwork, route(0, 5)!.pointIds, at(positions.wrongWayOnAlpha));
   check("A position on the route is within a few feet of it", onRoute < 5, `${onRoute}`);
   check("A position past the route is far from it", offRoute > 1000, `${offRoute}`);
+
+  const midSegment = planRouteFrom(labTaxiNetwork, at(positions.taxiingOnAlpha), 5);
+  check(
+    "Routing from the middle of a segment can head either way",
+    spell(midSegment?.legs) === "A+B",
+    spell(midSegment?.legs),
+  );
+}
+
+function runRunways(): void {
+  check("23 and 05 are the same runway", sameRunway("23", "05"));
+  check("05L and 23R are the same runway", sameRunway("05L", "23R"));
+  check("05L and 23L are not the same runway", !sameRunway("05L", "23L"));
+  check("18 and 36 are the same runway", sameRunway("18", "36"));
+  check("01 and 19 are the same runway", sameRunway("01", "19"));
+  check("23 and 14 are different runways", !sameRunway("23", "14"));
+
+  const toHold = (from: number) => planRoute(labTaxiNetwork, from, 5);
+
+  check("Ramp 1 never crosses a runway on its way to runway 23", firstCrossingOf(labTaxiNetwork, toHold(0)!.pointIds, "23") === undefined);
+
+  const fromRampThree = toHold(14);
+  check(
+    "Ramp 3 can only reach runway 23 by crossing it",
+    spell(fromRampThree?.legs) === "F+E+x23+E+A+B",
+    spell(fromRampThree?.legs),
+  );
+
+  const crossing = firstCrossingOf(labTaxiNetwork, fromRampThree!.pointIds, "05");
+  check(
+    "A crossing of runway 23 is found when asked about runway 05",
+    crossing?.startIndex === 2 && crossing.endIndex === 3,
+    JSON.stringify(crossing),
+  );
+
+  check(
+    "The hold line nearest the runway's own threshold is the destination",
+    holdShortPointFor(labTaxiNetwork, runway23)?.id === 5,
+  );
 }
 
 interface Step {
@@ -81,12 +156,13 @@ interface Step {
 interface Scenario {
   name: string;
   runway?: string;
+  airport?: Airport;
   steps: Step[];
 }
 
 const A = positions;
 
-const taxiToRunway23 = "taxi_instruction:request:runway 23:C+A+B";
+const taxiToRunway23 = "taxi_instruction:request:runway 23:C+A+B:hold 23";
 
 const scenarios: Scenario[] = [
   {
@@ -112,7 +188,7 @@ const scenarios: Scenario[] = [
       {
         position: A.rampSpot,
         pilot: msg("readback", "05", "taxi"),
-        expect: ["taxi_instruction:readback_error:runway 23:C+A+B"],
+        expect: ["taxi_instruction:readback_error:runway 23:C+A+B:hold 23"],
       },
     ],
   },
@@ -120,8 +196,8 @@ const scenarios: Scenario[] = [
     name: "The route is repeated on request",
     steps: [
       { position: A.rampSpot, pilot: msg("request", "23", "taxi"), expect: [taxiToRunway23] },
-      { position: A.rampSpot, pilot: msg("question", null, "taxi"), expect: ["taxi_instruction:repeat:runway 23:C+A+B"] },
-      { position: A.rampSpot, pilot: msg("request", "23", "taxi"), expect: ["taxi_instruction:repeat:runway 23:C+A+B"] },
+      { position: A.rampSpot, pilot: msg("question", null, "taxi"), expect: ["taxi_instruction:repeat:runway 23:C+A+B:hold 23"] },
+      { position: A.rampSpot, pilot: msg("request", "23", "taxi"), expect: ["taxi_instruction:repeat:runway 23:C+A+B:hold 23"] },
     ],
   },
   {
@@ -134,7 +210,7 @@ const scenarios: Scenario[] = [
     name: "A wrong turn is corrected once, then left alone",
     steps: [
       { position: A.rampSpot, pilot: msg("request", "23", "taxi"), expect: [taxiToRunway23] },
-      { position: A.wrongWayOnAlpha, expect: ["taxi_instruction:off_route:runway 23:A+B"] },
+      { position: A.wrongWayOnAlpha, expect: ["taxi_instruction:off_route:runway 23:A+B:hold 23"] },
       { position: A.wrongWayOnAlpha, expect: [] },
     ],
   },
@@ -142,13 +218,13 @@ const scenarios: Scenario[] = [
     name: "The active runway decides the route",
     runway: "05",
     steps: [
-      { position: A.rampSpot, pilot: msg("request", null, "taxi"), expect: ["taxi_instruction:request:runway 05:C+A+D"] },
+      { position: A.rampSpot, pilot: msg("request", null, "taxi"), expect: ["taxi_instruction:request:runway 05:C+A+D:hold 05"] },
     ],
   },
   {
     name: "Holding short of the wrong runway is sent to the active one",
     steps: [
-      { position: A.holdingShortFarEnd, pilot: msg("request", null, "takeoff"), expect: ["taxi_instruction:request:runway 23:D+A+B"] },
+      { position: A.holdingShortFarEnd, pilot: msg("request", null, "takeoff"), expect: ["taxi_instruction:request:runway 23:D+A+B:hold 23"] },
     ],
   },
   {
@@ -176,10 +252,60 @@ const scenarios: Scenario[] = [
       { position: A.upwind, pilot: msg("request", null, "taxi"), expect: ["query:say_again"] },
     ],
   },
+  {
+    name: "The active runway is crossed only after holding short and being cleared",
+    steps: [
+      {
+        position: A.rampThree,
+        pilot: msg("request", null, "taxi"),
+        expect: ["taxi_instruction:request:runway 23:F+E:hold 23"],
+      },
+      { position: A.holdingShortLeftOfRunway, expect: ["taxi_instruction:continue:runway 23:E+A+B:hold 23:cross 23"] },
+      { position: A.middleOfTheRunway, expect: [] },
+      { position: A.holdingShortRightOfRunway, expect: [] },
+      { position: A.holdingShort, expect: [] },
+      { position: A.holdingShort, pilot: msg("request", null, "takeoff"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
+    name: "Waiting at the hold line does not repeat the crossing clearance",
+    steps: [
+      {
+        position: A.rampThree,
+        pilot: msg("request", null, "taxi"),
+        expect: ["taxi_instruction:request:runway 23:F+E:hold 23"],
+      },
+      { position: A.holdingShortLeftOfRunway, expect: ["taxi_instruction:continue:runway 23:E+A+B:hold 23:cross 23"] },
+      { position: A.holdingShortLeftOfRunway, expect: [] },
+    ],
+  },
+  {
+    name: "Entering the active runway at the crossing without being cleared is stopped",
+    steps: [
+      {
+        position: A.rampThree,
+        pilot: msg("request", null, "taxi"),
+        expect: ["taxi_instruction:request:runway 23:F+E:hold 23"],
+      },
+      { position: A.middleOfTheRunway, expect: ["instruct:hold_position"] },
+    ],
+  },
+  {
+    name: "A crossing of another runway is cleared as part of the route",
+    airport: crossRunwayAirport,
+    steps: [
+      {
+        position: { ...A.rampSpot, alongFeet: 2800, crossFeet: 600 },
+        pilot: msg("request", null, "parking"),
+        expect: ["taxi_instruction:request:Ramp 2:G+x13+G"],
+      },
+    ],
+  },
 ];
 
 function runScenarios(): void {
   for (const scenario of scenarios) {
+    const airport = scenario.airport ?? labAirport;
     let engine = createEngineState(scenario.runway ?? "23");
     let situation: Situation | undefined;
     let nowMs = 0;
@@ -189,7 +315,7 @@ function runScenarios(): void {
       nowMs += TICK_MS;
       const aircraft = at(position);
       const derived = deriveSituation(
-        { aircraft, airport: labAirport, runway: engine.runway, observedAtMs: nowMs },
+        { aircraft, airport, runway: engine.runway, observedAtMs: nowMs },
         situation,
       );
       situation = derived.situation;
@@ -197,7 +323,7 @@ function runScenarios(): void {
       const decision = decide(
         {
           aircraft,
-          airport: labAirport,
+          airport,
           situation,
           style: { strictness: "normal" },
           events: derived.events,
@@ -233,6 +359,7 @@ function runScenarios(): void {
 }
 
 runRouting();
+runRunways();
 runScenarios();
 
 check(

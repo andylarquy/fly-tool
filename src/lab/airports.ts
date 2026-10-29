@@ -16,7 +16,8 @@ const inRunway23Frame = (alongFeet: number, crossFeet: number) =>
  * Taxiway A runs parallel to the runway, 350 ft to its right. B connects it
  * to the hold line of runway 23, D to the hold line of runway 05 at the far
  * end, and C to the ramp. The two ramp spots are joined by an unnamed apron
- * path.
+ * path. Taxiway E crosses runway 23 at its midpoint to a second ramp (3) on
+ * the far side, so reaching the active runway from there means crossing it.
  */
 export const labTaxiNetwork: TaxiNetwork = {
   points: [
@@ -31,6 +32,10 @@ export const labTaxiNetwork: TaxiNetwork = {
     { id: 8, position: inRunway23Frame(5000, 150), holdShortRunway: "05" },
     { id: 9, position: inRunway23Frame(2800, 600) },
     { id: 10, position: inRunway23Frame(2800, 900) },
+    { id: 11, position: inRunway23Frame(2500, -350) },
+    { id: 12, position: inRunway23Frame(2500, -150), holdShortRunway: "23" },
+    { id: 13, position: inRunway23Frame(2500, 150), holdShortRunway: "23" },
+    { id: 14, position: inRunway23Frame(2500, -900) },
   ],
   segments: [
     { from: 0, to: 1, taxiway: "C" },
@@ -43,10 +48,15 @@ export const labTaxiNetwork: TaxiNetwork = {
     { from: 7, to: 8, taxiway: "D" },
     { from: 1, to: 9 },
     { from: 9, to: 10 },
+    { from: 2, to: 13, taxiway: "E" },
+    { from: 13, to: 12, crossesRunway: "23" },
+    { from: 12, to: 11, taxiway: "E" },
+    { from: 11, to: 14, taxiway: "F" },
   ],
   parking: [
     { id: 1, name: "Ramp 1", position: inRunway23Frame(2500, 900), pointId: 0 },
     { id: 2, name: "Ramp 2", position: inRunway23Frame(2800, 900), pointId: 10 },
+    { id: 3, name: "Ramp 3", position: inRunway23Frame(2500, -900), pointId: 14 },
   ],
 };
 

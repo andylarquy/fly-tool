@@ -91,5 +91,9 @@ export const positions = {
   clearOfRunway: ground(2500, 350),
   holdingShortFarEnd: ground(5000, 150),
   crossingRunway: ground(1000, 0, 8, 90),
-  offTheNetwork: ground(2500, -300),
+  offTheNetwork: ground(2500, -1500),
+  rampThree: ground(2500, -900),
+  holdingShortLeftOfRunway: ground(2500, -150),
+  middleOfTheRunway: ground(2500, 0, 8, 90),
+  holdingShortRightOfRunway: ground(2500, 150),
 } satisfies Record<string, RunwayFrameSpec>;

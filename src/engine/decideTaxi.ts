@@ -1,14 +1,22 @@
 import { AtcIntent } from "../domain/AtcIntent";
 import { EngineState } from "../domain/EngineState";
 import { FlightPhase } from "../domain/FlightPhase";
-import { TaxiDestination, TaxiInstructionReason, TaxiState } from "../domain/Taxi";
+import {
+  TaxiDestination,
+  TaxiInstructionReason,
+  TaxiState,
+} from "../domain/Taxi";
+import { TaxiNetwork } from "../domain/TaxiNetwork";
 import {
   distanceToPointFeet,
   distanceToRouteFeet,
+  firstCrossingOf,
   holdShortPointFor,
+  isOnNetwork,
+  legsAlong,
   nearestParking,
-  nearestPoint,
-  planRoute,
+  planRouteFrom,
+  TaxiRoute,
 } from "../taxi/routing";
 import { findActive, withClearance, withStatus } from "./clearances";
 import { Decision, DecisionContext } from "./decisionTypes";
@@ -26,19 +34,50 @@ const RUNWAY_CLEARANCES = ["line_up_and_wait", "takeoff", "land", "touch_and_go"
 const instructionFrom = (
   taxi: TaxiState,
   reason: TaxiInstructionReason,
-): AtcIntent => ({
+): Extract<AtcIntent, { type: "taxi_instruction" }> => ({
   type: "taxi_instruction",
   reason,
   destination: taxi.destination,
-  taxiways: taxi.taxiways,
-  holdShort: taxi.destination.kind === "runway" ? taxi.destination.runway : undefined,
+  legs: taxi.legs,
+  holdShort: taxi.holdShort,
 });
 
 const sameDestination = (a: TaxiDestination, b: TaxiDestination): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
+const destinationRunway = (destination: TaxiDestination): string | undefined =>
+  destination.kind === "runway" ? destination.runway : undefined;
+
+// The active runway is never crossed on the strength of the first
+// instruction: the pilot is told to hold short and is cleared across later.
+const planInstruction = (
+  network: TaxiNetwork,
+  route: TaxiRoute,
+  destination: TaxiDestination,
+  activeRunway: string,
+): TaxiState => {
+  const crossing = firstCrossingOf(network, route.pointIds, activeRunway);
+
+  if (!crossing) {
+    return {
+      destination,
+      pointIds: route.pointIds,
+      legs: route.legs,
+      holdShort: destinationRunway(destination),
+    };
+  }
+
+  return {
+    destination,
+    pointIds: route.pointIds,
+    legs: legsAlong(network, route.pointIds.slice(0, crossing.startIndex + 1)),
+    holdShort: activeRunway,
+    holdAtIndex: crossing.startIndex,
+  };
+};
+
 export const isOnTaxiNetwork = ({ airport, aircraft }: DecisionContext): boolean =>
-  airport.taxi !== undefined && nearestPoint(airport.taxi, aircraft) !== undefined;
+  airport.taxi !== undefined && isOnNetwork(airport.taxi, aircraft);
 
 export const repeatTaxiInstruction = (
   state: EngineState,
@@ -60,22 +99,21 @@ export const decideTaxiRequest = (
     return say({ type: "query", query: "say_again" }, state);
   }
 
-  const start = nearestPoint(network, aircraft);
+  const activeRunway = airport.runways.find((r) => r.designator === state.runway);
   const spot = kind === "parking" ? nearestParking(network, aircraft) : undefined;
-  const target =
-    kind === "runway"
-      ? holdShortPointFor(network, state.runway)
-      : network.points.find((point) => point.id === spot?.pointId);
 
   const destination: TaxiDestination | undefined =
+    kind === "runway" ? { kind: "runway", runway: state.runway } : spot && { kind: "parking", name: spot.name };
+
+  const targetId =
     kind === "runway"
-      ? { kind: "runway", runway: state.runway }
-      : spot && { kind: "parking", name: spot.name };
+      ? activeRunway && holdShortPointFor(network, activeRunway)?.id
+      : spot?.pointId;
 
   const route =
-    start && target && destination ? planRoute(network, start.id, target.id) : undefined;
+    destination && targetId !== undefined ? planRouteFrom(network, aircraft, targetId) : undefined;
 
-  if (!start || !target || !destination || !route) {
+  if (!destination || !route) {
     return say({ type: "unable", reason: "no_route" }, state);
   }
 
@@ -84,21 +122,15 @@ export const decideTaxiRequest = (
   }
 
   const reason: TaxiInstructionReason =
-    state.taxi && sameDestination(state.taxi.destination, destination)
-      ? "repeat"
-      : "request";
+    state.taxi && sameDestination(state.taxi.destination, destination) ? "repeat" : "request";
 
-  const taxi: TaxiState = {
-    destination,
-    pointIds: route.pointIds,
-    taxiways: route.taxiways,
-  };
+  const taxi = planInstruction(network, route, destination, state.runway);
 
   const clearances = withClearance(
     withStatus(state, ["taxi"], "cancelled"),
     "taxi",
     situation.observedAtMs,
-    destination.kind === "runway" ? destination.runway : "",
+    destinationRunway(destination) ?? "",
   );
 
   return say(instructionFrom(taxi, reason), { ...clearances, taxi });
@@ -116,6 +148,7 @@ const guardRunway = (
     !situation.onGround ||
     !situation.onRunway ||
     situation.phase !== FlightPhase.Taxiing ||
+    state.taxi?.crossingCleared ||
     findActive(state, [...RUNWAY_CLEARANCES]) ||
     (last !== undefined && situation.observedAtMs - last < INCURSION_COOLDOWN_MS)
   ) {
@@ -125,7 +158,7 @@ const guardRunway = (
   const base: TaxiState = state.taxi ?? {
     destination: { kind: "runway", runway: state.runway },
     pointIds: [],
-    taxiways: [],
+    legs: [],
   };
 
   return say(
@@ -134,36 +167,100 @@ const guardRunway = (
   );
 };
 
-export const decideTaxiProgress = (
+// A crossing clearance holds until the aircraft has actually been on the
+// runway and left it again.
+const trackCrossing = (ctx: DecisionContext, state: EngineState): EngineState => {
+  const crossing = state.taxi?.crossingCleared;
+
+  if (!state.taxi || !crossing) {
+    return state;
+  }
+
+  if (ctx.situation.onRunway && !crossing.sawRunway) {
+    return { ...state, taxi: { ...state.taxi, crossingCleared: { ...crossing, sawRunway: true } } };
+  }
+
+  return crossing.sawRunway && !ctx.situation.onRunway
+    ? { ...state, taxi: { ...state.taxi, crossingCleared: undefined } }
+    : state;
+};
+
+const clearAcrossActiveRunway = (
   ctx: DecisionContext,
   state: EngineState,
+  taxi: TaxiState,
+  holdIndex: number,
+): Decision | undefined => {
+  const network = ctx.airport.taxi!;
+  const crossing = firstCrossingOf(network, taxi.pointIds, state.runway, holdIndex);
+
+  if (!crossing) {
+    return undefined;
+  }
+
+  const next = firstCrossingOf(network, taxi.pointIds, state.runway, crossing.endIndex);
+  const stop = next ? next.startIndex + 1 : taxi.pointIds.length;
+
+  const continued: TaxiState = {
+    ...taxi,
+    legs: legsAlong(network, taxi.pointIds.slice(crossing.endIndex, stop)),
+    holdShort: next ? state.runway : destinationRunway(taxi.destination),
+    holdAtIndex: next?.startIndex,
+    crossingCleared: { runway: state.runway, sawRunway: false },
+    offRouteSinceMs: undefined,
+  };
+
+  return say(
+    { ...instructionFrom(continued, "continue"), crossFirst: state.runway },
+    { ...state, taxi: continued },
+  );
+};
+
+export const decideTaxiProgress = (
+  ctx: DecisionContext,
+  previous: EngineState,
 ): Decision => {
   const { airport, aircraft, situation } = ctx;
   const network = airport.taxi;
 
   if (!network) {
-    return silent(state);
+    return silent(previous);
   }
 
-  const incursion = guardRunway(ctx, state);
+  const incursion = guardRunway(ctx, previous);
 
   if (incursion) {
     return incursion;
   }
 
+  const state = trackCrossing(ctx, previous);
   const taxi = state.taxi;
 
   if (!taxi || taxi.pointIds.length < 2 || !situation.onGround) {
     return silent(state);
   }
 
-  const targetId = taxi.pointIds[taxi.pointIds.length - 1];
   const moving = aircraft.groundSpeed >= MOVING_KNOTS;
 
   if (
+    taxi.holdAtIndex !== undefined &&
     !moving &&
-    distanceToPointFeet(network, targetId, aircraft) <= ARRIVED_FEET
+    distanceToPointFeet(network, taxi.pointIds[taxi.holdAtIndex], aircraft) <= ARRIVED_FEET
   ) {
+    if (findActive(state, [...RUNWAY_CLEARANCES])) {
+      return silent(state);
+    }
+
+    const cleared = clearAcrossActiveRunway(ctx, state, taxi, taxi.holdAtIndex);
+
+    if (cleared) {
+      return cleared;
+    }
+  }
+
+  const targetId = taxi.pointIds[taxi.pointIds.length - 1];
+
+  if (!moving && distanceToPointFeet(network, targetId, aircraft) <= ARRIVED_FEET) {
     return silent({ ...withStatus(state, ["taxi"], "completed"), taxi: undefined });
   }
 
@@ -189,18 +286,14 @@ export const decideTaxiProgress = (
     return silent(state);
   }
 
-  const here = nearestPoint(network, aircraft);
-  const route = here ? planRoute(network, here.id, targetId) : undefined;
+  const route = planRouteFrom(network, aircraft, targetId);
 
   if (!route) {
     return silent(state);
   }
 
   const corrected: TaxiState = {
-    ...taxi,
-    pointIds: route.pointIds,
-    taxiways: route.taxiways,
-    offRouteSinceMs: undefined,
+    ...planInstruction(network, route, taxi.destination, state.runway),
     lastCorrectionAtMs: now,
   };
 

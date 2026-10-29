@@ -1,5 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
-import { TaxiDestination, TaxiInstructionReason } from "../../domain/Taxi";
+import { TaxiDestination, TaxiInstructionReason, TaxiLeg } from "../../domain/Taxi";
 import {
   EmergencyNature,
   EmergencyQuestion,
@@ -20,28 +20,38 @@ const NATO: Record<string, string> = {
   X: "X-ray", Y: "Yankee", Z: "Zulu",
 };
 
+const SPELLED_TAXIWAY = /^[A-Za-z]{1,2}\d{0,2}$/;
+
+// "A1" is spelled out ("Alpha 1"); a name such as "Apron" is already a word.
 export const spokenTaxiway = (name: string): string =>
-  name
-    .split("")
-    .map((character) => NATO[character.toUpperCase()] ?? character)
-    .join(" ");
+  SPELLED_TAXIWAY.test(name)
+    ? name
+        .split("")
+        .map((character) => NATO[character.toUpperCase()] ?? character)
+        .join(" ")
+    : name;
 
 const TAXI_LEAD_IN: Partial<Record<TaxiInstructionReason, string>> = {
   readback_error: "Negative.",
   off_route: "You are off the assigned route.",
 };
 
+const spokenLeg = (leg: TaxiLeg): string =>
+  leg.kind === "taxiway" ? spokenTaxiway(leg.name) : `cross runway ${leg.runway}`;
+
 const taxiSentence = (
   destination: TaxiDestination,
-  taxiways: string[],
+  legs: TaxiLeg[],
   holdShort?: string,
+  crossFirst?: string,
 ): string => {
   const where =
     destination.kind === "runway" ? `runway ${destination.runway}` : destination.name;
-  const via = taxiways.length > 0 ? ` via ${taxiways.map(spokenTaxiway).join(", ")}` : "";
+  const via = legs.length > 0 ? ` via ${legs.map(spokenLeg).join(", ")}` : "";
   const hold = holdShort ? `, hold short runway ${holdShort}` : "";
+  const cross = crossFirst ? `Cross runway ${crossFirst}. ` : "";
 
-  return `Taxi to ${where}${via}${hold}.`;
+  return `${cross}Taxi to ${where}${via}${hold}.`;
 };
 
 const URGENCY_WORDS: Record<EmergencyUrgency, string> = {
@@ -117,7 +127,7 @@ export const describeIntent = (intent: AtcIntent): string => {
       return fields([
         ["intent", "taxi_instruction"],
         ["lead_in", TAXI_LEAD_IN[intent.reason]],
-        ["text", taxiSentence(intent.destination, intent.taxiways, intent.holdShort)],
+        ["text", taxiSentence(intent.destination, intent.legs, intent.holdShort, intent.crossFirst)],
       ]);
     case "remark":
       return fields([["intent", "remark"], ["kind", intent.remark.kind]]);

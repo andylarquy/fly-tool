@@ -11,6 +11,7 @@ export interface TaxiSegment {
   from: number;
   to: number;
   taxiway?: string;
+  crossesRunway?: string;
 }
 
 export interface ParkingSpot {

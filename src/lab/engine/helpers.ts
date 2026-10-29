@@ -4,6 +4,7 @@ import { FlightPhase } from "../../domain/FlightPhase";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { Situation } from "../../domain/Situation";
 import { isAirbornePhase } from "../../situation/classifyPhase";
+import { pointFromRunwayFrame } from "../../utils/geo";
 import { labAirport } from "../airports";
 
 export const msg = (
@@ -35,7 +36,13 @@ export const label = (intent: AtcIntent): string => {
           ? `runway ${intent.destination.runway}`
           : intent.destination.name;
 
-      return `taxi_instruction:${intent.reason}:${where}:${intent.taxiways.join("+") || "-"}`;
+      const legs = intent.legs
+        .map((leg) => (leg.kind === "taxiway" ? leg.name : `x${leg.runway}`))
+        .join("+");
+      const cross = intent.crossFirst ? `:cross ${intent.crossFirst}` : "";
+      const hold = intent.holdShort ? `:hold ${intent.holdShort}` : "";
+
+      return `taxi_instruction:${intent.reason}:${where}:${legs || "-"}${hold}${cross}`;
     }
     case "acknowledge":
       return `acknowledge:${intent.kind}`;
@@ -46,9 +53,20 @@ export const label = (intent: AtcIntent): string => {
   }
 };
 
+const labRunway = labAirport.runways[0];
+
+// The airport's center is on a taxi path across the runway, so a generic
+// ground position for the stage lab has to be somewhere off the network.
+const OFF_THE_NETWORK = pointFromRunwayFrame(
+  labRunway.threshold,
+  labRunway.trueHeading,
+  2500,
+  -1500,
+);
+
 export const aircraftIn = (phase: FlightPhase): AircraftState => ({
-  latitude: labAirport.position.latitude,
-  longitude: labAirport.position.longitude,
+  latitude: OFF_THE_NETWORK.latitude,
+  longitude: OFF_THE_NETWORK.longitude,
   altitudeFeet: 500,
   trueHeading: 224,
   groundSpeed: 70,

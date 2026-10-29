@@ -279,7 +279,7 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "request",
         destination: { kind: "runway", runway: "23" },
-        taxiways: ["C", "A", "B"],
+        legs: [{ kind: "taxiway", name: "C" }, { kind: "taxiway", name: "A" }, { kind: "taxiway", name: "B" }],
         holdShort: "23",
       },
     ],
@@ -296,7 +296,7 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "request",
         destination: { kind: "runway", runway: "05" },
-        taxiways: ["A1", "B"],
+        legs: [{ kind: "taxiway", name: "A1" }, { kind: "taxiway", name: "B" }],
         holdShort: "05",
       },
     ],
@@ -312,7 +312,7 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "request",
         destination: { kind: "parking", name: "Ramp 1" },
-        taxiways: ["C"],
+        legs: [{ kind: "taxiway", name: "C" }],
       },
     ],
     expectations: {
@@ -328,7 +328,7 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "request",
         destination: { kind: "runway", runway: "23" },
-        taxiways: [],
+        legs: [],
         holdShort: "23",
       },
     ],
@@ -345,7 +345,7 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "off_route",
         destination: { kind: "runway", runway: "23" },
-        taxiways: ["A", "B"],
+        legs: [{ kind: "taxiway", name: "A" }, { kind: "taxiway", name: "B" }],
         holdShort: "23",
       },
     ],
@@ -361,13 +361,70 @@ export const renderCases: RenderCase[] = [
         type: "taxi_instruction",
         reason: "readback_error",
         destination: { kind: "runway", runway: "23" },
-        taxiways: ["C", "A", "B"],
+        legs: [{ kind: "taxiway", name: "C" }, { kind: "taxiway", name: "A" }, { kind: "taxiway", name: "B" }],
         holdShort: "23",
       },
     ],
     expectations: {
       responseRequired: true,
       requiredConcepts: ["negative", "taxi to runway 23", "charlie, alpha, bravo"],
+    },
+  },
+  {
+    name: "Crossing clearance after holding short",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "continue",
+        destination: { kind: "runway", runway: "23" },
+        legs: [
+          { kind: "taxiway", name: "E" },
+          { kind: "taxiway", name: "A" },
+          { kind: "taxiway", name: "B" },
+        ],
+        holdShort: "23",
+        crossFirst: "23",
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["cross runway 23", "taxi to runway 23", "echo, alpha, bravo", "hold short runway 23"],
+    },
+  },
+  {
+    name: "A crossing inside the route",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "parking", name: "Ramp 2" },
+        legs: [
+          { kind: "taxiway", name: "G" },
+          { kind: "cross", runway: "13" },
+          { kind: "taxiway", name: "G" },
+        ],
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["taxi to ramp 2", "golf, cross runway 13, golf"],
+      forbiddenPatterns: ["hold short"],
+    },
+  },
+  {
+    name: "A taxiway that is a word is not spelled out",
+    intents: [
+      {
+        type: "taxi_instruction",
+        reason: "request",
+        destination: { kind: "parking", name: "Ramp 1" },
+        legs: [{ kind: "taxiway", name: "Apron" }],
+      },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["via apron"],
+      forbiddenPatterns: ["alpha"],
     },
   },
   {
