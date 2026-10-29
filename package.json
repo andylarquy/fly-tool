@@ -15,6 +15,7 @@
     "lab:benchmark": "npm run build && node dist/lab/benchmark/benchmark.js",
     "lab:classify": "npm run build && node dist/lab/classification/classification.js",
     "lab:engine": "npm run build && node dist/lab/engine/engine.js",
+    "lab:memory": "npm run build && node dist/lab/memory/memory.js",
     "lab:render": "npm run build && node dist/lab/render/render.js",
     "lab:pipeline": "npm run build && node dist/lab/pipeline/pipeline.js"
   },

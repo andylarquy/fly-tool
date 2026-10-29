@@ -1,5 +1,6 @@
 import { AtcIntent } from "../domain/AtcIntent";
 import { EngineState } from "../domain/EngineState";
+import { attachRemark } from "./remarks";
 import { decideEvents, decideTick } from "./decideEvents";
 import { decideTransmission } from "./decideTransmission";
 import { ask } from "./decisions";
@@ -27,5 +28,5 @@ export const decide = (
   apply(decideEvents(ctx, state, events));
   apply(decideTick(ctx, state));
 
-  return { intents, state };
+  return attachRemark(ctx, state, intents, events);
 };

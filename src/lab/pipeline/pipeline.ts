@@ -5,7 +5,9 @@ import {
   PipelineState,
   runPipelineTurn,
 } from "../../pipeline/atcPipeline";
-import { labAirport } from "../airports";
+import { DEFAULT_PILOT_PROFILE } from "../../domain/defaultPilot";
+import { createPilotRecord } from "../../memory/recordKeeping";
+import { labAirport, labTower } from "../airports";
 import { evaluateResponse } from "../benchmark/checks";
 import { pipelineScenarios } from "./scenarios";
 import { telemetryAt } from "./telemetry";
@@ -14,6 +16,7 @@ const ACTIVE_RUNWAY = "23";
 const SETTLE_TICKS = 5;
 const TICK_MS = 1000;
 const NO_RESPONSE = "[NO RESPONSE]";
+export const EPOCH_MS = Date.UTC(2026, 9, 29, 12);
 
 async function runPipelineLab(): Promise<void> {
   const runway = labAirport.runways.find((r) => r.designator === ACTIVE_RUNWAY);
@@ -23,7 +26,6 @@ async function runPipelineLab(): Promise<void> {
   }
 
   const callsign = DEFAULT_FLIGHT_PLAN.callsign;
-  const style = { strictness: "normal" as const };
   const failedScenarios: string[] = [];
 
   console.log(`Pipeline lab with ${MODEL}\n`);
@@ -31,7 +33,10 @@ async function runPipelineLab(): Promise<void> {
   for (const scenario of pipelineScenarios) {
     console.log(`=== ${scenario.name} [${scenario.origin}] ===`);
 
-    let state: PipelineState = createPipelineState(ACTIVE_RUNWAY);
+    let state: PipelineState = createPipelineState(
+      ACTIVE_RUNWAY,
+      scenario.record ?? createPilotRecord(DEFAULT_PILOT_PROFILE.pilotId, DEFAULT_PILOT_PROFILE.displayName),
+    );
     let nowMs = 0;
     const failures: string[] = [];
 
@@ -42,7 +47,7 @@ async function runPipelineLab(): Promise<void> {
       for (let tick = 0; tick < SETTLE_TICKS; tick++) {
         nowMs += TICK_MS;
         const turn = await runPipelineTurn(
-          { aircraft, airport: labAirport, observedAtMs: nowMs, style, callsign },
+          { aircraft, airport: labAirport, observedAtMs: nowMs, facility: labTower, epochMs: EPOCH_MS + nowMs, callsign },
           state,
         );
         state = turn.state;
@@ -61,7 +66,8 @@ async function runPipelineLab(): Promise<void> {
             aircraft,
             airport: labAirport,
             observedAtMs: nowMs,
-            style,
+            facility: labTower,
+            epochMs: EPOCH_MS + nowMs,
             callsign,
             pilotTransmission: step.pilot,
           },

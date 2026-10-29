@@ -9,13 +9,20 @@ import { Airport } from "../domain/Airport";
 import { AtcIntent } from "../domain/AtcIntent";
 import { ControllerStyle } from "../domain/ControllerStyle";
 import { EngineState } from "../domain/EngineState";
+import { Facility } from "../domain/Facility";
+import { FacilityRelationship, PilotRecord } from "../domain/PilotRecord";
 import { FlightEvent } from "../domain/FlightEvent";
 import { PilotMessage } from "../domain/PilotMessage";
 import { Situation } from "../domain/Situation";
+import { deriveStyle } from "../memory/familiarity";
+import { getRelationship, recordTurn, startVisit } from "../memory/recordKeeping";
 import { deriveSituation } from "../situation/deriveSituation";
 
 export interface PipelineState {
   engine: EngineState;
+  record: PilotRecord;
+  visitStarted: boolean;
+  history?: FacilityRelationship;
   situation?: Situation;
   lastAtcTransmission?: string;
 }
@@ -24,7 +31,10 @@ export interface PipelineInput {
   aircraft: AircraftState;
   airport: Airport;
   observedAtMs: number;
-  style: ControllerStyle;
+  facility: Facility;
+  epochMs: number;
+  trafficCount?: number;
+  style?: ControllerStyle;
   callsign?: string;
   pilotTransmission?: string;
 }
@@ -42,16 +52,39 @@ export interface PipelineTurn {
   trace: PipelineTrace;
 }
 
-export const createPipelineState = (runway: string): PipelineState => ({
+export const createPipelineState = (
+  runway: string,
+  record: PilotRecord,
+): PipelineState => ({
   engine: createEngineState(runway),
+  record,
+  visitStarted: false,
 });
 
 export const runPipelineTurn = async (
   input: PipelineInput,
   previous: PipelineState,
 ): Promise<PipelineTurn> => {
-  const { aircraft, airport, observedAtMs, style, callsign, pilotTransmission } =
-    input;
+  const {
+    aircraft,
+    airport,
+    observedAtMs,
+    facility,
+    epochMs,
+    trafficCount,
+    callsign,
+    pilotTransmission,
+  } = input;
+
+  let { record, history, visitStarted } = previous;
+
+  if (!visitStarted) {
+    history = getRelationship(record, facility.id);
+    record = startVisit(record, facility.id, epochMs);
+    visitStarted = true;
+  }
+
+  const style = input.style ?? deriveStyle(history, epochMs, trafficCount);
 
   const { situation, events } = deriveSituation(
     { aircraft, airport, runway: previous.engine.runway, observedAtMs },
@@ -81,7 +114,15 @@ export const runPipelineTurn = async (
   }
 
   const decision = decide(
-    { aircraft, airport, situation, style, events, pilot },
+    {
+      aircraft,
+      airport,
+      situation,
+      style,
+      events,
+      pilot,
+      memory: { history, epochMs },
+    },
     previous.engine,
   );
 
@@ -95,6 +136,9 @@ export const runPipelineTurn = async (
     transmission: rendered?.text,
     state: {
       engine: decision.state,
+      record: recordTurn(record, facility.id, events, decision.intents, epochMs),
+      visitStarted,
+      history,
       situation,
       lastAtcTransmission: rendered?.text ?? previous.lastAtcTransmission,
     },

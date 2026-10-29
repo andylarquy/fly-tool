@@ -1,3 +1,4 @@
+import { PilotRecord } from "../../domain/PilotRecord";
 import { BenchmarkExpectations } from "../benchmark/benchmarkTypes";
 import { positions, RunwayFrameSpec } from "./telemetry";
 
@@ -8,10 +9,13 @@ export interface PipelineStep {
 }
 
 export interface PipelineScenario {
+  record?: PilotRecord;
   name: string;
   origin: "benchmark" | "adapted" | "new";
   steps: PipelineStep[];
 }
+
+import { knownPilot } from "./records";
 
 const silent: BenchmarkExpectations = { responseRequired: false };
 
@@ -276,6 +280,37 @@ export const pipelineScenarios: PipelineScenario[] = [
           responseRequired: true,
           requiredConcepts: ["unable"],
           forbiddenPatterns: ["knots", "degrees"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A returning regular is recognized",
+    origin: "new",
+    record: knownPilot({ visits: 7 }),
+    steps: [
+      {
+        position: positions.inboundFromSouth,
+        pilot: "Tower, five miles south, request pattern entry runway 23, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["23", "you again"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A firm previous landing is mentioned",
+    origin: "new",
+    record: knownPilot({ visits: 3, lastLandingFpm: -780 }),
+    steps: [
+      {
+        position: positions.inboundFromSouth,
+        pilot: "Tower, five miles south, request pattern entry runway 23, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["23", "landing gear"],
+          forbiddenPatterns: ["780", "feet per minute"],
         },
       },
     ],
