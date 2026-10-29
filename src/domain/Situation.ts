@@ -21,6 +21,7 @@ export interface Situation {
   geometry: RunwayRelativePosition;
   onGround: boolean;
   onRunway: boolean;
+  holdingShortRunway?: string;
   inAirspace: boolean;
   lastVerticalSpeedFeetPerMinute: number;
 }

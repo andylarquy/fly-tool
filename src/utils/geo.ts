@@ -62,3 +62,48 @@ export const runwayOffset = (
     crossFeet: -northFeet * Math.sin(heading) + eastFeet * Math.cos(heading),
   };
 };
+
+export const distanceFeet = (from: GeoPoint, to: GeoPoint): number => {
+  const { northFeet, eastFeet } = localOffset(from, to);
+  return Math.hypot(northFeet, eastFeet);
+};
+
+// Inverse of `runwayOffset`: a point given in the runway frame.
+export const pointFromRunwayFrame = (
+  threshold: GeoPoint,
+  runwayHeading: number,
+  alongFeet: number,
+  crossFeet: number,
+): GeoPoint => {
+  const heading = toRadians(runwayHeading);
+  const northFeet = alongFeet * Math.cos(heading) - crossFeet * Math.sin(heading);
+  const eastFeet = alongFeet * Math.sin(heading) + crossFeet * Math.cos(heading);
+
+  return {
+    latitude: threshold.latitude + northFeet / FEET_PER_DEGREE_LATITUDE,
+    longitude:
+      threshold.longitude +
+      eastFeet / (FEET_PER_DEGREE_LATITUDE * Math.cos(toRadians(threshold.latitude))),
+  };
+};
+
+export const distanceToSegmentFeet = (
+  point: GeoPoint,
+  start: GeoPoint,
+  end: GeoPoint,
+): number => {
+  const p = localOffset(start, point);
+  const s = localOffset(start, end);
+  const lengthSquared = s.northFeet ** 2 + s.eastFeet ** 2;
+
+  if (lengthSquared === 0) {
+    return Math.hypot(p.northFeet, p.eastFeet);
+  }
+
+  const t = Math.max(
+    0,
+    Math.min(1, (p.northFeet * s.northFeet + p.eastFeet * s.eastFeet) / lengthSquared),
+  );
+
+  return Math.hypot(p.northFeet - t * s.northFeet, p.eastFeet - t * s.eastFeet);
+};

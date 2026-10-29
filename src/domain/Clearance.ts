@@ -3,7 +3,8 @@ export type ClearanceKind =
   | "takeoff"
   | "land"
   | "touch_and_go"
-  | "pattern_entry";
+  | "pattern_entry"
+  | "taxi";
 
 export type ClearanceStatus =
   | "issued"

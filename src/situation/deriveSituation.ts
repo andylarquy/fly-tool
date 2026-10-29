@@ -8,6 +8,7 @@ import {
   distanceNauticalMiles,
   runwayOffset,
 } from "../utils/geo";
+import { holdingShortRunway } from "../taxi/routing";
 import { classifyPhase, isOnRunway } from "./classifyPhase";
 
 const PHASE_DWELL_MS = 3000;
@@ -142,13 +143,19 @@ export const deriveSituation = (
     previousPhase: previous?.phase,
   });
 
+  const resolved = resolvePhase(raw, observedAtMs, aircraft.isOnGround, previous);
+
   const situation: Situation = {
     observedAtMs,
     runway: designator,
-    ...resolvePhase(raw, observedAtMs, aircraft.isOnGround, previous),
+    ...resolved,
     geometry,
     onGround: aircraft.isOnGround,
     onRunway: isOnRunway(runway, geometry),
+    holdingShortRunway:
+      resolved.phase === FlightPhase.HoldingShort && airport.taxi
+        ? holdingShortRunway(airport.taxi, aircraft)
+        : undefined,
     inAirspace:
       geometry.distanceToAirportNauticalMiles <=
         airport.airspace.radiusNauticalMiles &&

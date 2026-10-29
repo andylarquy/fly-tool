@@ -1,4 +1,5 @@
 import { GeoPoint } from "./GeoPoint";
+import { TaxiNetwork } from "./TaxiNetwork";
 
 export type PatternSide = "left" | "right";
 
@@ -24,4 +25,5 @@ export interface Airport {
   patternAltitudeFeetAgl: number;
   airspace: Airspace;
   runways: Runway[];
+  taxi?: TaxiNetwork;
 }

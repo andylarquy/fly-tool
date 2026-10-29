@@ -2,6 +2,7 @@ import { AircraftState } from "../domain/AircraftState";
 import { Airport, Runway } from "../domain/Airport";
 import { FlightPhase } from "../domain/FlightPhase";
 import { RunwayRelativePosition } from "../domain/Situation";
+import { holdingShortRunway } from "../taxi/routing";
 import { angleDifferenceDegrees, bearingDegrees } from "../utils/geo";
 
 const STATIONARY_MAX_KNOTS = 1;
@@ -36,6 +37,7 @@ export const isOnRunway = (
 
 const classifyOnGround = ({
   aircraft,
+  airport,
   runway,
   geometry,
   previousPhase,
@@ -43,7 +45,13 @@ const classifyOnGround = ({
   const stationary = aircraft.groundSpeed < STATIONARY_MAX_KNOTS;
 
   if (!isOnRunway(runway, geometry)) {
-    return stationary ? FlightPhase.Stationary : FlightPhase.Taxiing;
+    if (!stationary) {
+      return FlightPhase.Taxiing;
+    }
+
+    return airport.taxi && holdingShortRunway(airport.taxi, aircraft)
+      ? FlightPhase.HoldingShort
+      : FlightPhase.Stationary;
   }
 
   const landing =
@@ -157,6 +165,7 @@ export const isAirbornePhase = (phase: FlightPhase): boolean =>
   ![
     FlightPhase.Stationary,
     FlightPhase.Taxiing,
+    FlightPhase.HoldingShort,
     FlightPhase.LinedUp,
     FlightPhase.TakeoffRoll,
     FlightPhase.LandingRoll,

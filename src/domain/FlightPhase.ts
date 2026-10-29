@@ -1,6 +1,7 @@
 export enum FlightPhase {
   Stationary = "stationary",
   Taxiing = "taxiing",
+  HoldingShort = "holding_short",
   LinedUp = "lined_up",
   TakeoffRoll = "takeoff_roll",
   Upwind = "upwind",
