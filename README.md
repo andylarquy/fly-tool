@@ -5,7 +5,7 @@ Local-first flight-simulator immersion engine. It connects to Microsoft Flight S
 ## Requirements
 
 - [Node.js 20.17+](https://nodejs.org/)
-- Microsoft Flight Simulator 2024 running on the same PC (not needed for `npm run lab` or `npm run benchmark`)
+- Microsoft Flight Simulator 2024 running on the same PC (not needed for `npm run lab:chat` or `npm run lab:benchmark`)
 - [Ollama](https://ollama.com/) running locally with the model configured in `src/ai/modelConfig.ts` pulled
 
 This project uses [node-simconnect](https://www.npmjs.com/package/node-simconnect), a TypeScript implementation of SimConnect. It does not require the MSFS SDK or any SimConnect DLLs.
@@ -42,8 +42,8 @@ The live app does not yet build real situational context for ATC; it sends an em
 Neither needs the simulator.
 
 ```powershell
-npm run lab        # interactive ATC loop against fixed aircraft states (src/lab/cases.ts)
-npm run benchmark  # runs the scenario suite 3x each and writes a report to benchmark-results/
+npm run lab:chat       # interactive ATC loop against fixed aircraft states (src/lab/cases.ts)
+npm run lab:benchmark  # runs the scenario suite 3x each and writes a report to benchmark-results/
 ```
 
 The ATC aviation knowledge base lives in `knowledge/*.md` and is appended to the system prompt.

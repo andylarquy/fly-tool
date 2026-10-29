@@ -11,12 +11,12 @@
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
     "dev": "npm run build && npm start",
-    "lab": "npm run build && node dist/lab/lab.js",
-    "benchmark": "npm run build && node dist/lab/benchmark/benchmark.js",
-    "classify": "npm run build && node dist/lab/classification/classification.js",
-    "engine": "npm run build && node dist/lab/engine/engine.js",
-    "render": "npm run build && node dist/lab/render/render.js",
-    "pipeline": "npm run build && node dist/lab/pipeline/pipeline.js"
+    "lab:chat": "npm run build && node dist/lab/lab.js",
+    "lab:benchmark": "npm run build && node dist/lab/benchmark/benchmark.js",
+    "lab:classify": "npm run build && node dist/lab/classification/classification.js",
+    "lab:engine": "npm run build && node dist/lab/engine/engine.js",
+    "lab:render": "npm run build && node dist/lab/render/render.js",
+    "lab:pipeline": "npm run build && node dist/lab/pipeline/pipeline.js"
   },
   "dependencies": {
     "node-simconnect": "^4.2.0",

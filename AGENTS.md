@@ -19,8 +19,8 @@ Implemented:
   system prompt.
 - Conversation history/memory across turns, with explicit reset/seed hooks
   for testing (`resetConversation`, `seedConversationTurn` in `ai.ts`).
-- Two interactive CLIs (`npm run dev`, `npm run lab`) and a behavioral
-  benchmark harness (`npm run benchmark`) — see below.
+- Two interactive CLIs (`npm run dev`, `npm run lab:chat`) and a behavioral
+  benchmark harness (`npm run lab:benchmark`) — see below.
 
 Known gap: `src/index.ts` (the live MSFS path) currently sends an empty
 `AtcState.situationContext` and the placeholder `DEFAULT_FLIGHT_PLAN` —
@@ -43,18 +43,18 @@ doesn't have real situational grounding yet.
 
 - `npm run dev` — build + run `src/index.ts`. Connects to MSFS via
   SimConnect, streams live telemetry, reads pilot transmissions from stdin.
-- `npm run lab` — build + run `src/lab/lab.ts`. Same interactive loop but
+- `npm run lab:chat` — build + run `src/lab/lab.ts`. Same interactive loop but
   against fixed `AircraftState`/`AtcState` fixtures in `src/lab/cases.ts` —
   no simulator required, useful for iterating on the prompt/knowledge base
   quickly.
-- `npm run benchmark` — build + run `src/lab/benchmark/benchmark.ts`. Runs a
+- `npm run lab:benchmark` — build + run `src/lab/benchmark/benchmark.ts`. Runs a
   fixed scenario suite (`src/lab/benchmark/scenarios.ts`, roughly twenty
   scenarios covering readbacks, traffic pattern, takeoff, landing) against
   the model 3x each, evaluates each response with simple string checks
   (`checks.ts`), and writes a markdown report to `/benchmark-results/`
   (gitignored). Requires Ollama running locally with the configured `MODEL`
   pulled; takes a few minutes.
-- `npm run classify` — build + run `src/lab/classification/classification.js`.
+- `npm run lab:classify` — build + run `src/lab/classification/classification.js`.
   Experiment for the planned "language -> structured JSON -> code logic ->
   language" pipeline: runs labeled pilot transmissions
   (`classification/samples.ts`) through `classifyPilotMessage`
@@ -64,15 +64,15 @@ doesn't have real situational grounding yet.
   confusion summary. Samples that carry emergency details also run
   `extractEmergencyDetails` and check every field, including ones that must
   stay empty. Not wired into the live app.
-- `npm run engine` — build + run `src/lab/engine/engine.js`.
+- `npm run lab:engine` — build + run `src/lab/engine/engine.js`.
   Deterministic (no Ollama): replays scripted pilot messages/phases/events
   through `decide` and checks the resulting `AtcIntent` labels per step.
   Exits non-zero on any mismatch.
-- `npm run render` — build + run `src/lab/render/render.js`. Feeds fixed
+- `npm run lab:render` — build + run `src/lab/render/render.js`. Feeds fixed
   `AtcIntent` lists (`render/cases.ts`) to `renderTransmission` 3x each and
   checks the wording with the benchmark's substring checks (plus "starts with
   the callsign"). Needs Ollama; tests the Render stage in isolation.
-- `npm run pipeline` — build + run `src/lab/pipeline/pipeline.js`. End to end
+- `npm run lab:pipeline` — build + run `src/lab/pipeline/pipeline.js`. End to end
   (classify -> derive situation -> engine -> render) over multi-step
   scenarios with phase-consistent telemetry (`pipeline/telemetry.ts`). Many
   scenarios are ported from the benchmark with their original expectations;
@@ -226,12 +226,13 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   (`report.ts`'s `sanitizeForFilename`).
 - **`npm run build` compiles the whole project**, not just one entry point —
   there's no per-file build. A new script entry is just
-  `npm run build && node dist/path/to/file.js` in `package.json`.
+  `npm run build && node dist/path/to/file.js` in `package.json`. Anything
+  under `src/lab/` is exposed as `lab:<name>`.
 
 ## Sanity-checking changes
 
 There's no test framework. `npx tsc --noEmit` is the baseline check after
 any edit. For behavior changes to the ATC prompt or knowledge base,
-`npm run lab` (single interaction, fast) or `npm run benchmark` (full suite)
+`npm run lab:chat` (single interaction, fast) or `npm run lab:benchmark` (full suite)
 are how to validate against the model — reading the printed responses
 matters as much as the PASS/FAIL count.
