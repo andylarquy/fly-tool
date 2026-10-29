@@ -3,6 +3,7 @@ import { AtcIntent } from "../../domain/AtcIntent";
 import { ControllerStyle } from "../../domain/ControllerStyle";
 import { MODEL, THINKING, parseModelContent } from "../modelConfig";
 import { describeIntent } from "./describeIntent";
+import { RenderedRemark, renderRemark } from "./remarkRenderer";
 import { RENDER_SYSTEM_PROMPT, RENDER_TEMPERATURE } from "./rendererConfig";
 
 export interface RenderInput {
@@ -14,6 +15,7 @@ export interface RenderInput {
 export interface RenderResult {
   text: string;
   response: ChatResponse;
+  remarks: RenderedRemark[];
 }
 
 export const renderTransmission = async ({
@@ -21,7 +23,9 @@ export const renderTransmission = async ({
   intents,
   style,
 }: RenderInput): Promise<RenderResult | undefined> => {
-  if (intents.length === 0) {
+  const operational = intents.filter((intent) => intent.type !== "remark");
+
+  if (operational.length === 0) {
     return undefined;
   }
 
@@ -39,7 +43,7 @@ STYLE
 ${style.strictness}
 
 INTENTS
-${intents.map((intent, index) => `${index + 1}. ${describeIntent(intent)}`).join("\n")}
+${operational.map((intent, index) => `${index + 1}. ${describeIntent(intent)}`).join("\n")}
 `,
       },
     ],
@@ -49,5 +53,15 @@ ${intents.map((intent, index) => `${index + 1}. ${describeIntent(intent)}`).join
 
   const { content } = parseModelContent(response.message.content);
 
-  return { text: content.trim(), response };
+  const remarks = await Promise.all(
+    intents.flatMap((intent) =>
+      intent.type === "remark" ? [renderRemark(intent.remark.kind, style)] : [],
+    ),
+  );
+
+  return {
+    text: [content.trim(), ...remarks.map((remark) => remark.text)].join(" "),
+    response,
+    remarks,
+  };
 };

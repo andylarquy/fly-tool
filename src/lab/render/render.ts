@@ -34,7 +34,10 @@ async function runRender(): Promise<void> {
       totalRuns++;
       passedRuns += failures.length === 0 ? 1 : 0;
 
-      console.log(`${failures.length === 0 ? "PASS" : "FAIL"} ${text}`);
+      const fallbacks = result?.remarks.filter((remark) => !remark.improvised) ?? [];
+      const note = fallbacks.length > 0 ? "  [remark fell back to fixed text]" : "";
+
+      console.log(`${failures.length === 0 ? "PASS" : "FAIL"} ${text}${note}`);
       failures.forEach((failure) => console.log(`     ${failure}`));
     }
   }

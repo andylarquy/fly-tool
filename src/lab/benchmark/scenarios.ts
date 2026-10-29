@@ -12,6 +12,11 @@ import { positions } from "./telemetry";
  * already issued, a report already requested) is established by earlier steps
  * of the same scenario, not assumed.
  *
+ * Remarks (welcome back, landing comments) are improvised by the model, so
+ * the memory scenarios only check the operational part of the reply and what
+ * must not appear. Whether a remark was attached shows in the report's
+ * Decision column; read the wording yourself.
+ *
  * Origins: "ported" keeps the original single-call benchmark's expectation,
  * "adapted" keeps its intent but follows the engine's design (a requested
  * report gets the next instruction; an unrequested one gets silence), and
@@ -592,7 +597,7 @@ export const scenarios: BenchmarkScenario[] = [
     steps: [
       withExpectation(enterPattern, {
         responseRequired: true,
-        requiredConcepts: ["23", "you again"],
+        requiredConcepts: ["23", "report downwind"],
       }),
     ],
   },
@@ -604,8 +609,8 @@ export const scenarios: BenchmarkScenario[] = [
     steps: [
       withExpectation(enterPattern, {
         responseRequired: true,
-        requiredConcepts: ["23", "landing gear"],
-        forbiddenPatterns: ["780", "feet per minute"],
+        requiredConcepts: ["23", "report downwind"],
+        forbiddenPatterns: ["780", "feet per minute", "fpm"],
       }),
     ],
   },
@@ -620,8 +625,8 @@ export const scenarios: BenchmarkScenario[] = [
         position: positions.landingRoll,
         expect: {
           responseRequired: true,
-          requiredConcepts: ["vacate", "nice landing"],
-          forbiddenPatterns: ["feet per minute", "90"],
+          requiredConcepts: ["vacate", "23"],
+          forbiddenPatterns: ["feet per minute", "fpm", "90"],
         },
       },
     ],
@@ -636,7 +641,15 @@ export const scenarios: BenchmarkScenario[] = [
       withExpectation(enterPattern, {
         responseRequired: true,
         requiredConcepts: ["23"],
-        forbiddenPatterns: ["welcome back", "you again", "landing gear"],
+        forbiddenPatterns: [
+          "welcome back",
+          "you again",
+          "back again",
+          "old friend",
+          "nice to see",
+          "landing gear",
+          "gently",
+        ],
       }),
     ],
   },

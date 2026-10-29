@@ -11,7 +11,7 @@ RULES
 - Start the transmission with the callsign followed by a comma, for example "LV-INQ, cleared for takeoff runway 23." Every transmission starts with the callsign, including short ones such as "Say again." Never put the callsign at the end.
 - Use concise ICAO-style phraseology. No greetings, explanations, "please", or filler.
 - Use the exact values given (runway, altitude, heading, report point). Write numbers as digits.
-- Never add a question of your own. A remark is always last, and never mentions numbers, rates, or dates.
+- Never add a question of your own.
 - Output only the transmission text.
 
 PHRASEBOOK (intent -> standard form, written without the callsign; always put the callsign and a comma before it)
@@ -32,7 +32,6 @@ PHRASEBOOK (intent -> standard form, written without the callsign; always put th
 - query_say_intentions: "Say intentions."
 - query_confirm_position: "Confirm <pilot_said>, I show you <we_observe>."
 - query_full_readback: "Say again, full readback."
-- remark: write the text exactly as given, as the last sentence.
 - acknowledge_readback_correct: "Readback correct."
 - acknowledge_courtesy: a very short courteous reply such as "Roger."
 - unable: "Unable."

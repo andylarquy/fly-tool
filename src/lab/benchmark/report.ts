@@ -125,7 +125,7 @@ export function buildMarkdownReport(results: ScenarioResult[]): string {
         ? `**Step ${index + 1} — Pilot:** "${step.pilot}"`
         : `**Step ${index + 1} — no pilot transmission**`;
 
-      lines.push(heading, "", "| Run | Result | Pilot turn | ATC |", "| --- | --- | --- | --- |");
+      lines.push(heading, "", "| Run | Result | Pilot turn | Decision | ATC |", "| --- | --- | --- | --- | --- |");
 
       for (const run of runs) {
         const result = run.steps[index];
@@ -138,7 +138,7 @@ export function buildMarkdownReport(results: ScenarioResult[]): string {
           result.elapsedMs === undefined ? "-" : seconds(result.elapsedMs);
 
         lines.push(
-          `| ${run.run} | ${verdict} | ${latency} | ${escapeTableCell(result.response)} |`,
+          `| ${run.run} | ${verdict} | ${latency} | ${escapeTableCell(result.trace ?? "-")} | ${escapeTableCell(result.response)} |`,
         );
       }
 

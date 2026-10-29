@@ -220,7 +220,7 @@ export const renderCases: RenderCase[] = [
     ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["left traffic", "23", "report downwind", "welcome back"],
+      requiredConcepts: ["left traffic", "23", "report downwind"],
     },
   },
   {
@@ -232,7 +232,7 @@ export const renderCases: RenderCase[] = [
     ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["cleared to land", "23", "you again"],
+      requiredConcepts: ["cleared to land", "23"],
     },
   },
   {
@@ -244,8 +244,8 @@ export const renderCases: RenderCase[] = [
     ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["report downwind", "landing gear"],
-      forbiddenPatterns: ["feet per minute", "fpm", "last time"],
+      requiredConcepts: ["report downwind"],
+      forbiddenPatterns: ["feet per minute", "fpm"],
     },
   },
   {
@@ -256,7 +256,7 @@ export const renderCases: RenderCase[] = [
     ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["vacate", "23", "nice landing"],
+      requiredConcepts: ["vacate", "23"],
       forbiddenPatterns: ["90", "feet per minute"],
     },
   },
@@ -268,7 +268,7 @@ export const renderCases: RenderCase[] = [
     ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["vacate", "23", "firm"],
+      requiredConcepts: ["vacate", "23"],
       forbiddenPatterns: ["650", "feet per minute"],
     },
   },

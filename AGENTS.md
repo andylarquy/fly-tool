@@ -186,16 +186,18 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       phrasebook prompt. Empty intents means no model call (silence).
       `describeIntent` deliberately leaves out internal values such as the
       touchdown rate so the model can't read them out, and hands the model
-      the exact wording for emergency urgency, nature and questions and for
-      remarks (the 4B model added questions of its own, and swapped
-      `previous_firm_landing` for `firm_landing`, when asked to choose).
-    - `knowledgeBase.ts` — loads every `.md` file from root-level
-      `/knowledge/` (sorted by filename, hence the `01-`, `02-` prefixes),
-      concatenates them under a `## filename` heading each, appended to the
-      system prompt in `ai.ts`. Deliberately **not** under `src/` — `tsc`
-      only emits `.ts` output to `dist/`, so any asset a compiled script
-      reads at runtime needs to live outside `src/` and be resolved via
-      `process.cwd()`. The same applies to `/benchmark-results/`.
+      the exact wording for emergency urgency, nature and questions (the 4B
+      model added questions of its own when asked to choose them).
+    - `remarkRenderer.ts` / `remarkConfig.ts` — remarks are improvised, in a
+      separate call at a higher temperature, from a plain-language fact plus a
+      mood (`REMARK_FACTS`). The operational part of the transmission never
+      depends on it. The improvised line is validated in code (no digits,
+      <= 10 words, no operational words, no emoji, a short list of details
+      the model likes to invent, and mood/time checks per kind so a firm
+      landing is not praised and an earlier visit is not "just now"); if it
+      fails, `REMARK_FALLBACK` (a fixed sentence) is spoken instead. Reading
+      the output is still necessary: the guards stop contradictions, not
+      every embellishment.
 - `src/lab/`
   - `airports.ts` — fictional "Lab Field" (`ZZZZ`) with runways 23/05 and a
     tower, used to exercise the situation derivation. Not real data.
