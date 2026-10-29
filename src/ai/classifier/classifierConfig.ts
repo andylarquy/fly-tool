@@ -14,7 +14,7 @@ type:
 - request: the pilot asks for, or announces readiness for, a clearance, instruction, or service. "Ready for departure" is always a request, even if the last ATC transmission was a hold short or line up instruction.
 - readback: the pilot repeats or acknowledges an instruction or clearance from the last ATC transmission (including "roger", "wilco", or a repeat that contains a wrong detail). A readback only repeats what ATC already said.
 - position_report: the pilot states where they are or what they are doing, without asking for anything.
-- question: the pilot asks ATC for information or asks ATC to confirm something.
+- question: the pilot asks ATC for information, or asks ATC to confirm or verify something. Transmissions that start with words like "confirm", "verify", "what", "which", "can you", or "do you" are questions.
 - emergency: the pilot declares MAYDAY or PAN-PAN, or reports an emergency.
 - other: greetings, thanks, or anything else.
 
@@ -34,7 +34,8 @@ subject:
 - base: the pilot is on or turning onto the base leg.
 - final: the pilot is on final or short final.
 - go_around: going around or missed approach.
-- other: anything that fits none of the above, such as weather, wind, active runway, acknowledgements, greetings.`;
+- weather: wind, pressure, visibility, or other weather information.
+- other: anything that fits none of the above, such as the active runway, acknowledgements, greetings.`;
 
 // A null inside the enum makes Ollama's constrained decoding always pick null.
 export const NO_RUNWAY = "none";

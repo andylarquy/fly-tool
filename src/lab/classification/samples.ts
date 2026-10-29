@@ -153,7 +153,7 @@ export const samples: ClassificationSample[] = [
   },
   {
     pilot: "Tower, can you say the wind?",
-    expected: msg("question", null, "other"),
+    expected: msg("question", null, "weather"),
   },
   {
     pilot: "MAYDAY MAYDAY MAYDAY, LV-INQ, engine failure, 700 feet.",
