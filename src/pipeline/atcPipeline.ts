@@ -59,6 +59,16 @@ export interface PipelineTurn {
   trace: PipelineTrace;
 }
 
+// "Say again" asks the pilot to repeat an instruction; it must not replace the
+// instruction the pilot's next transmission is read back against.
+const repeatsOnly = (intents: AtcIntent[]): boolean =>
+  intents.length > 0 &&
+  intents.every(
+    (intent) =>
+      intent.type === "query" &&
+      (intent.query === "say_again" || intent.query === "full_readback"),
+  );
+
 export const createPipelineState = (
   runway: string,
   record: PilotRecord,
@@ -111,7 +121,10 @@ export const runPipelineTurn = async (
     });
 
     timings.classifyMs = performance.now() - classifyStart;
-    message = classification.message;
+    message = classification.message && {
+      ...classification.message,
+      transcript: pilotTransmission,
+    };
 
     if (message && (message.type === "emergency" || previous.engine.emergency)) {
       const extractStart = performance.now();
@@ -134,6 +147,7 @@ export const runPipelineTurn = async (
       events,
       pilot,
       memory: { history, epochMs },
+      callsign,
     },
     previous.engine,
   );
@@ -153,7 +167,9 @@ export const runPipelineTurn = async (
       visitStarted,
       history,
       situation,
-      lastAtcTransmission: rendered?.text ?? previous.lastAtcTransmission,
+      lastAtcTransmission: repeatsOnly(decision.intents)
+        ? previous.lastAtcTransmission
+        : (rendered?.text ?? previous.lastAtcTransmission),
     },
     trace: {
       situation,

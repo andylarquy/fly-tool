@@ -37,4 +37,5 @@ export interface PilotMessage {
   runway: string | null;
   subject: PilotMessageSubject;
   emergency?: EmergencyDetails;
+  transcript?: string;
 }

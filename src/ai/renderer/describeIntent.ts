@@ -1,4 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
+import { spokenLetter } from "../../utils/phonetic";
 import { TaxiDestination, TaxiInstructionReason, TaxiLeg } from "../../domain/Taxi";
 import {
   EmergencyNature,
@@ -12,14 +13,6 @@ const fields = (entries: [string, string | number | boolean | undefined][]): str
     .map(([key, value]) => `${key}=${value}`)
     .join(" | ");
 
-const NATO: Record<string, string> = {
-  A: "Alpha", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo", F: "Foxtrot",
-  G: "Golf", H: "Hotel", I: "India", J: "Juliett", K: "Kilo", L: "Lima",
-  M: "Mike", N: "November", O: "Oscar", P: "Papa", Q: "Quebec", R: "Romeo",
-  S: "Sierra", T: "Tango", U: "Uniform", V: "Victor", W: "Whiskey",
-  X: "X-ray", Y: "Yankee", Z: "Zulu",
-};
-
 const SPELLED_TAXIWAY = /^[A-Za-z]{1,2}\d{0,2}$/;
 
 // "A1" is spelled out ("Alpha 1"); a name such as "Apron" is already a word.
@@ -27,7 +20,7 @@ export const spokenTaxiway = (name: string): string =>
   SPELLED_TAXIWAY.test(name)
     ? name
         .split("")
-        .map((character) => NATO[character.toUpperCase()] ?? character)
+        .map((character) => spokenLetter(character) ?? character)
         .join(" ")
     : name;
 

@@ -11,6 +11,7 @@ import {
   withStatus,
 } from "./clearances";
 import { decideEmergency, hasEmergencyDetails } from "./decideEmergency";
+import { checkTaxiReadback } from "./taxiReadback";
 import {
   decideTaxiRequest,
   isOnTaxiNetwork,
@@ -142,11 +143,39 @@ const decideRequest = (
   }
 };
 
+// How much of a taxi readback has to be right depends on the controller: a
+// strict one wants the whole route and the hold-short back, a normal one the
+// hold-short and no wrong names, a relaxed one only the right runway (a wrong
+// turn is still caught later by the progress check).
+const checkTaxiFidelity = (
+  { style, callsign }: DecisionContext,
+  state: EngineState,
+  message: PilotMessage,
+): Decision | undefined => {
+  const taxi = state.taxi;
+
+  if (!taxi || !message.transcript || style.strictness === "relaxed") {
+    return undefined;
+  }
+
+  const heard = checkTaxiReadback(message.transcript, taxi.legs, taxi.holdShort, callsign);
+
+  if (heard.unexpected.length > 0) {
+    return repeatTaxiInstruction(state, "readback_error");
+  }
+
+  const incomplete =
+    !heard.holdShortHeard || (style.strictness === "strict" && heard.missing.length > 0);
+
+  return incomplete ? ask("full_readback", state) : undefined;
+};
+
 const decideReadback = (
-  { style }: DecisionContext,
+  ctx: DecisionContext,
   state: EngineState,
   message: PilotMessage,
 ): Decision => {
+  const { style } = ctx;
   const pending = findPendingReadback(state);
 
   if (!pending) {
@@ -169,6 +198,14 @@ const decideReadback = (
       { type: "correct_readback", clearance: pending.kind, runway: pending.runway },
       state,
     );
+  }
+
+  if (pending.kind === "taxi") {
+    const fidelity = checkTaxiFidelity(ctx, state, message);
+
+    if (fidelity) {
+      return fidelity;
+    }
   }
 
   if (
@@ -257,12 +294,26 @@ const decideQuestion = (
   }
 };
 
+const REQUEST_WORDS = /\b(request|requesting|solicito|solicitamos|ready)\b/i;
+
+// A taxi call that arrives while a taxi instruction still waits for its
+// readback, and does not ask for anything, is the readback.
+const readBackAsRequest = (state: EngineState, message: PilotMessage): boolean =>
+  message.type === "request" &&
+  (message.subject === "taxi" || message.subject === "parking") &&
+  findPendingReadback(state)?.kind === "taxi" &&
+  message.transcript !== undefined &&
+  !REQUEST_WORDS.test(message.transcript);
+
 export const decidePilotMessage = (
   ctx: DecisionContext,
   previous: EngineState,
-  message: PilotMessage,
+  heard: PilotMessage,
 ): Decision => {
   const state = { ...previous, contacted: true };
+  const message: PilotMessage = readBackAsRequest(state, heard)
+    ? { ...heard, type: "readback" }
+    : heard;
 
   if (message.type === "emergency" || (state.emergency && hasEmergencyDetails(message))) {
     return decideEmergency(ctx, state, message);
