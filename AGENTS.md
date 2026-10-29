@@ -72,6 +72,10 @@ doesn't have real situational grounding yet.
   `AtcIntent` lists (`render/cases.ts`) to `renderTransmission` 3x each and
   checks the wording with the benchmark's substring checks (plus "starts with
   the callsign"). Needs Ollama; tests the Render stage in isolation.
+- `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
+  (no Ollama, fixed clock): familiarity/strictness table, the remark rules
+  through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
+  a temp directory. Exits non-zero on any failure.
 - `npm run lab:pipeline` — build + run `src/lab/pipeline/pipeline.js`. End to end
   (classify -> derive situation -> engine -> render) over multi-step
   scenarios with phase-consistent telemetry (`pipeline/telemetry.ts`). Many
@@ -98,7 +102,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   Also the world/memory model: `Airport`/`Runway`/`Facility` (static data),
   `FlightPhase`, `Situation` and `FlightEvent` (derived, see below),
   `Clearance`/`PilotIntent` (session state), `PilotRecord` (long-term memory
-  keyed by pilot profile, not callsign, behind `PilotRecordStore`). Not all of
+  keyed by pilot profile, not callsign, behind `PilotRecordStore`), and
+  `Remark`/`RemarkKind` (the small bits of flavor the engine may add).
+  `defaultPilot.ts` holds the placeholder `DEFAULT_PILOT_PROFILE`. Not all of
   these are wired into `AtcSession`/`ai.ts` yet.
 - `src/situation/` — deterministic derivation, no LLM. `deriveSituation`
   turns `AircraftState` + `Airport` + active runway into a `Situation`
@@ -124,12 +130,30 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   clearance follows on base/final. Position-style subjects (legs,
   "airborne") are treated as position reports even if the classifier labeled
   the type `other`.
+  Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
+  reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
+  not strict, no emergency, past a 120 s gap since the last remark, once per
+  kind per session, one history remark per session (never while the pilot is
+  busy), and not the same kind the last session ended with. Touchdown
+  remarks follow the landing quality. They need `DecisionContext.memory`;
+  without it the engine never remarks.
   Readback checks always correct a wrong runway/clearance; a missing runway is
   tolerated unless strictness is "strict". Not wired into `ai.ts`/`index.ts`.
 - `src/pipeline/` — `runPipelineTurn`: one tick/turn through classify ->
   `deriveSituation` -> `decide` -> `renderTransmission`, returning the
   transmission plus a trace. Owns no hidden state; the caller passes and
   receives `PipelineState`. Not wired into `index.ts`/`ai.ts` yet.
+- `src/memory/` — long-term memory, no LLM. `recordKeeping.ts` (immutable
+  updates to a `PilotRecord`: visits, landings with touchdown rate, readback
+  errors, last remark; `recordTurn` applies a turn's events/intents),
+  `familiarity.ts` (stranger/acquaintance/regular from the *prior* visit
+  history, then `strictnessFor(familiarity, trafficCount)`; strict only for
+  strangers/acquaintances at a busy field, relaxed only for regulars at a
+  quiet one), `landingQuality.ts` (smooth/normal/firm/hard by touchdown
+  rate), and `jsonPilotRecordStore.ts` (one file per pilot under the
+  gitignored root-level `/data/pilot-records/`, atomic write). The pipeline
+  keeps the live record in `PipelineState`; the *caller* decides when to
+  `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
 - `src/ai/` — everything that talks to Ollama, split by job:
@@ -164,8 +188,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       phrasebook prompt. Empty intents means no model call (silence).
       `describeIntent` deliberately leaves out internal values such as the
       touchdown rate so the model can't read them out, and hands the model
-      the exact wording for emergency urgency, nature and questions (the 4B
-      model added questions of its own when asked to choose them).
+      the exact wording for emergency urgency, nature and questions and for
+      remarks (the 4B model added questions of its own, and swapped
+      `previous_firm_landing` for `firm_landing`, when asked to choose).
     - `knowledgeBase.ts` — loads every `.md` file from root-level
       `/knowledge/` (sorted by filename, hence the `01-`, `02-` prefixes),
       concatenates them under a `## filename` heading each, appended to the
