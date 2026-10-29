@@ -206,6 +206,73 @@ export const renderCases: RenderCase[] = [
     },
   },
   {
+    name: "Welcome back after a clearance",
+    intents: [
+      {
+        type: "instruct",
+        instruction: "enter_pattern",
+        runway: "23",
+        patternSide: "left",
+        altitudeFeetAgl: 1000,
+        expectReport: "downwind",
+      },
+      { type: "remark", remark: { kind: "welcome_back" } },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["left traffic", "23", "report downwind", "welcome back"],
+    },
+  },
+  {
+    name: "You again for a regular",
+    strictness: "relaxed",
+    intents: [
+      { type: "issue_clearance", clearance: "land", runway: "23" },
+      { type: "remark", remark: { kind: "you_again" } },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["cleared to land", "23", "you again"],
+    },
+  },
+  {
+    name: "Caution after a firm previous landing",
+    strictness: "relaxed",
+    intents: [
+      { type: "instruct", instruction: "report", expectReport: "downwind" },
+      { type: "remark", remark: { kind: "previous_firm_landing" } },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["report downwind", "landing gear"],
+      forbiddenPatterns: ["feet per minute", "fpm", "last time"],
+    },
+  },
+  {
+    name: "Smooth landing remark",
+    intents: [
+      { type: "instruct", instruction: "vacate_runway", runway: "23", touchdownFeetPerMinute: -90 },
+      { type: "remark", remark: { kind: "smooth_landing" } },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["vacate", "23", "nice landing"],
+      forbiddenPatterns: ["90", "feet per minute"],
+    },
+  },
+  {
+    name: "Firm landing remark",
+    intents: [
+      { type: "instruct", instruction: "vacate_runway", runway: "23", touchdownFeetPerMinute: -650 },
+      { type: "remark", remark: { kind: "firm_landing" } },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["vacate", "23", "firm"],
+      forbiddenPatterns: ["650", "feet per minute"],
+    },
+  },
+  {
     name: "Readback confirmed in strict mode",
     strictness: "strict",
     intents: [{ type: "acknowledge", kind: "readback_correct" }],

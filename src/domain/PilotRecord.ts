@@ -1,3 +1,5 @@
+import { RemarkKind } from "./Remark";
+
 export interface LandingRecord {
   atMs: number;
   runway?: string;
@@ -11,6 +13,8 @@ export interface FacilityRelationship {
   lastSeenAtMs: number;
   landings: LandingRecord[];
   readbackErrorCount: number;
+  lastRemarkKind?: RemarkKind;
+  lastRemarkAtMs?: number;
 }
 
 export interface PilotRecord {

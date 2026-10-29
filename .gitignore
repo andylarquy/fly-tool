@@ -4,4 +4,4 @@ dist/
 benchmark-results/
 
 # Kept locally in case the previous C# setup needs to be referenced.
-SimConnect.Local.props
+SimConnect.Local.propsdata/

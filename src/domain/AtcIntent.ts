@@ -2,6 +2,7 @@ import { PatternSide } from "./Airport";
 import { ClearanceKind } from "./Clearance";
 import { EmergencyNature, EmergencyQuestion, EmergencyUrgency } from "./Emergency";
 import { FlightPhase } from "./FlightPhase";
+import { Remark } from "./Remark";
 
 export type ReportPoint = "crosswind" | "downwind" | "base" | "final";
 
@@ -29,6 +30,7 @@ export type AtcIntent =
       claimed?: ReportPoint;
       observed?: FlightPhase;
     }
+  | { type: "remark"; remark: Remark }
   | { type: "acknowledge"; kind: "readback_correct" | "courtesy" }
   | {
       type: "emergency_response";

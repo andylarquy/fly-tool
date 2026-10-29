@@ -1,4 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
+import { RemarkKind } from "../../domain/Remark";
 import {
   EmergencyNature,
   EmergencyQuestion,
@@ -10,6 +11,14 @@ const fields = (entries: [string, string | number | boolean | undefined][]): str
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${value}`)
     .join(" | ");
+
+const REMARK_TEXT: Record<RemarkKind, string> = {
+  welcome_back: "Welcome back.",
+  you_again: "You again, welcome back.",
+  previous_firm_landing: "Go easy on the landing gear this time.",
+  smooth_landing: "Nice landing.",
+  firm_landing: "That was a firm one.",
+};
 
 const URGENCY_WORDS: Record<EmergencyUrgency, string> = {
   mayday: "MAYDAY",
@@ -80,6 +89,8 @@ export const describeIntent = (intent: AtcIntent): string => {
         ["pilot_said", intent.claimed],
         ["we_observe", intent.observed && words(intent.observed)],
       ]);
+    case "remark":
+      return fields([["intent", "remark"], ["text", REMARK_TEXT[intent.remark.kind]]]);
     case "acknowledge":
       return fields([["intent", `acknowledge_${intent.kind}`]]);
     case "unable":
