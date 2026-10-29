@@ -15,7 +15,8 @@
     "benchmark": "npm run build && node dist/lab/benchmark/benchmark.js",
     "classify": "npm run build && node dist/lab/classification/classification.js",
     "engine": "npm run build && node dist/lab/engine/engine.js",
-    "render": "npm run build && node dist/lab/render/render.js"
+    "render": "npm run build && node dist/lab/render/render.js",
+    "pipeline": "npm run build && node dist/lab/pipeline/pipeline.js"
   },
   "dependencies": {
     "node-simconnect": "^4.2.0",
