@@ -15,7 +15,6 @@ export const createEngineState = (runway: string): EngineState => ({
   runway,
   clearances: [],
   contacted: false,
-  emergency: false,
 });
 
 export const kindsForSubject = (

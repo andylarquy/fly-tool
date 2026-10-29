@@ -163,12 +163,46 @@ export const renderCases: RenderCase[] = [
     },
   },
   {
-    name: "Emergency response",
-    intents: [{ type: "emergency_response" }],
+    name: "Mayday with nature already given asks only for intentions",
+    intents: [
+      { type: "emergency_response", urgency: "mayday", nature: "engine_failure", ask: ["intention"] },
+    ],
     expectations: {
       responseRequired: true,
-      requiredConcepts: ["mayday", "intentions"],
-      forbiddenPatterns: ["cleared", "report downwind"],
+      requiredConcepts: ["mayday", "engine failure", "intentions"],
+      forbiddenPatterns: ["nature of", "cleared", "report downwind"],
+    },
+  },
+  {
+    name: "Mayday with no details asks for nature and intentions",
+    intents: [
+      { type: "emergency_response", urgency: "mayday", ask: ["nature", "intention"] },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["mayday", "nature of emergency", "intentions"],
+    },
+  },
+  {
+    name: "Pan-pan is not answered as a mayday",
+    intents: [
+      { type: "emergency_response", urgency: "pan_pan", nature: "fire", ask: [] },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["pan-pan", "fire"],
+      forbiddenPatterns: ["mayday", "say"],
+    },
+  },
+  {
+    name: "Secondary emergency questions",
+    intents: [
+      { type: "emergency_response", urgency: "mayday", nature: "medical", ask: ["souls", "fuel"] },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["souls on board", "fuel"],
+      forbiddenPatterns: ["nature of", "intentions"],
     },
   },
   {

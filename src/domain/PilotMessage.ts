@@ -25,6 +25,8 @@ export const PILOT_MESSAGE_SUBJECTS = [
   "other",
 ] as const;
 
+import { EmergencyDetails } from "./Emergency";
+
 export type PilotMessageType = (typeof PILOT_MESSAGE_TYPES)[number];
 export type PilotMessageSubject = (typeof PILOT_MESSAGE_SUBJECTS)[number];
 
@@ -32,4 +34,5 @@ export interface PilotMessage {
   type: PilotMessageType;
   runway: string | null;
   subject: PilotMessageSubject;
+  emergency?: EmergencyDetails;
 }

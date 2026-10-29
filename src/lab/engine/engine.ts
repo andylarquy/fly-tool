@@ -30,7 +30,8 @@ const msg = (
   type: PilotMessage["type"],
   runway: string | null,
   subject: PilotMessage["subject"],
-): PilotMessage => ({ type, runway, subject });
+  emergency?: PilotMessage["emergency"],
+): PilotMessage => ({ type, runway, subject, emergency });
 
 const label = (intent: AtcIntent): string => {
   switch (intent.type) {
@@ -40,6 +41,10 @@ const label = (intent: AtcIntent): string => {
       return `instruct:${intent.instruction}`;
     case "query":
       return `query:${intent.query}`;
+    case "emergency_response":
+      return intent.ask.length > 0
+        ? `emergency_response:${intent.ask.join("+")}`
+        : "emergency_response";
     case "advise":
       return `advise:${intent.topic}`;
     case "unable":
@@ -197,10 +202,39 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
-    name: "Emergency and unintelligible input",
+    name: "Unintelligible input",
     steps: [
-      { atMs: 0, phase: P.Upwind, pilot: msg("emergency", null, "other"), expect: ["emergency_response"] },
-      { atMs: 2000, phase: P.Upwind, pilot: "unintelligible", expect: ["query:say_again"] },
+      { atMs: 0, phase: P.Upwind, pilot: "unintelligible", expect: ["query:say_again"] },
+    ],
+  },
+  {
+    name: "Mayday without details asks for nature and intentions",
+    steps: [
+      { atMs: 0, phase: P.Upwind, pilot: msg("emergency", null, "other"), expect: ["emergency_response:nature+intention"] },
+      { atMs: 2000, phase: P.Upwind, pilot: msg("emergency", null, "other"), expect: ["emergency_response"] },
+    ],
+  },
+  {
+    name: "Emergency: stated details are remembered and the rest asked when it fits",
+    steps: [
+      { atMs: 0, phase: P.Upwind, pilot: msg("emergency", null, "other", { urgency: "mayday", nature: "engine_failure" }), expect: ["emergency_response:intention"] },
+      { atMs: 4000, phase: P.Upwind, pilot: msg("other", null, "other", { intention: "land_at_airport" }), expect: ["emergency_response"] },
+      { atMs: 30000, phase: P.Downwind, pilot: msg("other", null, "other", { soulsOnBoard: 3 }), expect: ["emergency_response:fuel"] },
+      { atMs: 50000, phase: P.Base, pilot: msg("other", null, "other", { fuelEnduranceMinutes: 40 }), expect: ["emergency_response", "issue_clearance:land"] },
+      { atMs: 52000, phase: P.Base, pilot: msg("readback", "23", "landing"), expect: [] },
+    ],
+  },
+  {
+    name: "Emergency: souls and fuel are asked once the pilot is not busy",
+    steps: [
+      { atMs: 0, phase: P.Downwind, pilot: msg("emergency", null, "other", { nature: "medical", intention: "land_at_airport" }), expect: ["emergency_response:souls+fuel"] },
+      { atMs: 4000, phase: P.Downwind, pilot: msg("position_report", null, "downwind"), expect: [] },
+    ],
+  },
+  {
+    name: "Pan-pan keeps its urgency",
+    steps: [
+      { atMs: 0, phase: P.Downwind, pilot: msg("emergency", null, "other", { urgency: "pan_pan", nature: "fire" }), expect: ["emergency_response:intention"] },
     ],
   },
   {

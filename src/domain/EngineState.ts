@@ -1,4 +1,5 @@
 import { ReportPoint } from "./AtcIntent";
+import { EmergencyState } from "./Emergency";
 import { Clearance } from "./Clearance";
 
 export interface EngineState {
@@ -7,5 +8,5 @@ export interface EngineState {
   expectedReport?: ReportPoint;
   contacted: boolean;
   airspaceEnteredAtMs?: number;
-  emergency: boolean;
+  emergency?: EmergencyState;
 }

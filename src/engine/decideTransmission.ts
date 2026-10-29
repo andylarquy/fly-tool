@@ -10,6 +10,7 @@ import {
   withClearance,
   withStatus,
 } from "./clearances";
+import { decideEmergency, hasEmergencyDetails } from "./decideEmergency";
 import { ask, clear, instructReport, say, silent } from "./decisions";
 import {
   asReportPoint,
@@ -228,8 +229,8 @@ export const decideTransmission = (
 ): Decision => {
   const state = { ...previous, contacted: true };
 
-  if (message.type === "emergency") {
-    return say({ type: "emergency_response" }, { ...state, emergency: true });
+  if (message.type === "emergency" || (state.emergency && hasEmergencyDetails(message))) {
+    return decideEmergency(ctx, state, message);
   }
 
   if (message.subject === "go_around") {
@@ -254,6 +255,10 @@ export const decideTransmission = (
     case "question":
       return decideQuestion(ctx, state, message);
     default:
+      if (asReportPoint(message.subject) || message.subject === "airborne") {
+        return decidePositionReport(ctx, state, message);
+      }
+
       return ctx.style.strictness === "relaxed"
         ? say({ type: "acknowledge", kind: "courtesy" }, state)
         : silent(state);

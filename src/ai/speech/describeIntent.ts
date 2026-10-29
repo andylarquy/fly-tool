@@ -1,10 +1,46 @@
 import { AtcIntent } from "../../domain/AtcIntent";
+import {
+  EmergencyNature,
+  EmergencyQuestion,
+  EmergencyUrgency,
+} from "../../domain/Emergency";
 
 const fields = (entries: [string, string | number | boolean | undefined][]): string =>
   entries
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${value}`)
     .join(" | ");
+
+const URGENCY_WORDS: Record<EmergencyUrgency, string> = {
+  mayday: "MAYDAY",
+  pan_pan: "PAN-PAN",
+};
+
+const NATURE_WORDS: Record<EmergencyNature, string | undefined> = {
+  engine_failure: "engine failure",
+  fire: "fire",
+  medical: "medical emergency",
+  fuel: "fuel emergency",
+  electrical: "electrical failure",
+  other: undefined,
+};
+
+const emergencyQuestions = (ask: EmergencyQuestion[]): string => {
+  const sentences: string[] = [];
+
+  if (ask.includes("nature")) sentences.push("Say nature of emergency.");
+  if (ask.includes("intention")) sentences.push("Say intentions.");
+
+  if (ask.includes("souls") && ask.includes("fuel")) {
+    sentences.push("Say souls on board and fuel remaining.");
+  } else if (ask.includes("souls")) {
+    sentences.push("Say souls on board.");
+  } else if (ask.includes("fuel")) {
+    sentences.push("Say fuel remaining.");
+  }
+
+  return sentences.join(" ") || "none";
+};
 
 const words = (value: string): string => value.replace(/_/g, " ");
 
@@ -49,6 +85,11 @@ export const describeIntent = (intent: AtcIntent): string => {
     case "unable":
       return fields([["intent", "unable"]]);
     case "emergency_response":
-      return fields([["intent", "emergency_response"]]);
+      return fields([
+        ["intent", "emergency_response"],
+        ["urgency", URGENCY_WORDS[intent.urgency]],
+        ["nature", intent.nature && NATURE_WORDS[intent.nature]],
+        ["questions", emergencyQuestions(intent.ask)],
+      ]);
   }
 };

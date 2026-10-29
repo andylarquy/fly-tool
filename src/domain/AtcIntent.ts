@@ -1,5 +1,6 @@
 import { PatternSide } from "./Airport";
 import { ClearanceKind } from "./Clearance";
+import { EmergencyNature, EmergencyQuestion, EmergencyUrgency } from "./Emergency";
 import { FlightPhase } from "./FlightPhase";
 
 export type ReportPoint = "crosswind" | "downwind" | "base" | "final";
@@ -29,5 +30,10 @@ export type AtcIntent =
       observed?: FlightPhase;
     }
   | { type: "acknowledge"; kind: "readback_correct" | "courtesy" }
-  | { type: "emergency_response" }
+  | {
+      type: "emergency_response";
+      urgency: EmergencyUrgency;
+      nature?: EmergencyNature;
+      ask: EmergencyQuestion[];
+    }
   | { type: "unable"; reason: "no_information" | "not_supported" };
