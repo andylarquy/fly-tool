@@ -66,6 +66,17 @@ doesn't have real situational grounding yet.
   Deterministic (no Ollama): replays scripted pilot messages/phases/events
   through `decide` and checks the resulting `AtcIntent` labels per step.
   Exits non-zero on any mismatch.
+- `npm run render` — build + run `src/lab/render/render.js`. Feeds fixed
+  `AtcIntent` lists (`render/cases.ts`) to `renderTransmission` 3x each and
+  checks the wording with the benchmark's substring checks (plus "starts with
+  the callsign"). Needs Ollama; tests the Render stage in isolation.
+- `npm run pipeline` — build + run `src/lab/pipeline/pipeline.js`. End to end
+  (classify -> derive situation -> engine -> render) over multi-step
+  scenarios with phase-consistent telemetry (`pipeline/telemetry.ts`). Many
+  scenarios are ported from the benchmark with their original expectations;
+  some disagree with the engine on purpose (it answers a *requested* report
+  with the next instruction and stays silent on unrequested ones). Needs
+  Ollama.
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -105,6 +116,10 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   active line-up clearance, a tick issues the takeoff clearance proactively.
   Readback checks always correct a wrong runway/clearance; a missing runway is
   tolerated unless strictness is "strict". Not wired into `ai.ts`/`index.ts`.
+- `src/pipeline/` — `runPipelineTurn`: one tick/turn through classify ->
+  `deriveSituation` -> `decide` -> `renderTransmission`, returning the
+  transmission plus a trace. Owns no hidden state; the caller passes and
+  receives `PipelineState`. Not wired into `index.ts`/`ai.ts` yet.
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
 - `src/ai/` — everything that talks to Ollama, split by job:
@@ -128,6 +143,11 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       `conversationHistory`.
     - `aiConfig.ts` — the system prompt (`AI_SYSTEM_PROMPT`). Edited by hand;
       don't rewrite it as a side effect of other changes.
+    - `intentRenderer.ts` / `rendererConfig.ts` / `describeIntent.ts` — the
+      Render stage: turns `AtcIntent[]` into one transmission using a small
+      phrasebook prompt. Empty intents means no model call (silence).
+      `describeIntent` deliberately leaves out internal values such as the
+      touchdown rate so the model can't read them out.
     - `knowledgeBase.ts` — loads every `.md` file from root-level
       `/knowledge/` (sorted by filename, hence the `01-`, `02-` prefixes),
       concatenates them under a `## filename` heading each, appended to the
