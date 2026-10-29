@@ -43,7 +43,7 @@ Neither needs the simulator.
 
 ```powershell
 npm run lab:chat       # interactive ATC loop against fixed aircraft states (src/lab/cases.ts)
-npm run lab:benchmark  # runs the scenario suite 3x each and writes a report to benchmark-results/
+npm run lab:benchmark  # end-to-end scenarios (classifier -> engine -> speech) 3x each, writes a report to benchmark-results/
 ```
 
 The ATC aviation knowledge base lives in `knowledge/*.md` and is appended to the system prompt.

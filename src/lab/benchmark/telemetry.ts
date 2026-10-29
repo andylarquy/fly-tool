@@ -81,6 +81,7 @@ export const positions = {
   base: air(-1500, -4500, 800, 90, -500),
   final: air(-4000, 0, 400, 0, -500),
   shortFinal: air(-1200, 0, 150, 0, -500, 65),
+  smoothFlare: air(-300, 0, 15, 0, -90, 60),
   inboundFromSouth: air(-9000, -30000, 1500, 0, 0, 100),
   landingRoll: ground(600, 0, 50),
 } satisfies Record<string, RunwayFrameSpec>;

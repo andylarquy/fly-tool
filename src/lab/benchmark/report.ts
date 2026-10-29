@@ -3,6 +3,11 @@ import { join } from "node:path";
 import { MODEL, THINKING } from "../../ai/modelConfig";
 import { BenchmarkRun, BenchmarkScenario } from "./benchmarkTypes";
 
+export interface ScenarioResult {
+  scenario: BenchmarkScenario;
+  runs: BenchmarkRun[];
+}
+
 const median = (values: number[]): number => {
   if (values.length === 0) {
     return 0;
@@ -18,88 +23,137 @@ const median = (values: number[]): number => {
   return sorted[middle];
 };
 
+const seconds = (ms: number): string => `${(ms / 1000).toFixed(2)} s`;
+
+const percent = (part: number, total: number): string =>
+  total === 0 ? "n/a" : `${((part / total) * 100).toFixed(0)}%`;
+
+const passedRuns = (runs: BenchmarkRun[]): number =>
+  runs.filter((run) => run.passed).length;
+
+const pilotSteps = (runs: BenchmarkRun[]) =>
+  runs.flatMap((run) => run.steps.filter((step) => step.elapsedMs !== undefined));
+
+const stageMedians = (results: ScenarioResult[]) => {
+  const steps = results.flatMap(({ runs }) => pilotSteps(runs));
+  const rendered = steps.filter((step) => (step.timings?.renderMs ?? 0) > 0);
+
+  return {
+    turn: median(steps.map((step) => step.elapsedMs ?? 0)),
+    classify: median(steps.map((step) => step.timings?.classifyMs ?? 0)),
+    render: median(rendered.map((step) => step.timings?.renderMs ?? 0)),
+    pilotTurns: steps.length,
+  };
+};
+
 export function printScenarioSummary(
   scenario: BenchmarkScenario,
   runs: BenchmarkRun[],
 ): void {
-  const passedRuns = runs.filter((run) => run.evaluation.passed).length;
+  const passed = passedRuns(runs);
 
-  const latencies = runs.map((run) => run.elapsedMs);
-
-  const medianLatency = median(latencies);
-
-  console.log("\nScenario summary");
-  console.log("----------------");
   console.log(
-    `Automated checks: ${passedRuns}/${runs.length} ` +
-      `(${((passedRuns / runs.length) * 100).toFixed(0)}%)`,
+    `\n${scenario.name} [${scenario.origin}]: ${passed}/${runs.length} ` +
+      `(${percent(passed, runs.length)}), median pilot turn ` +
+      seconds(median(pilotSteps(runs).map((step) => step.elapsedMs ?? 0))),
   );
 
-  console.log(`Median latency: ${(medianLatency / 1000).toFixed(2)} s`);
-
   for (const run of runs) {
-    console.log(
-      `  Run ${run.run}: ` +
-        `${run.evaluation.passed ? "PASS" : "FAIL"} ` +
-        `${(run.elapsedMs / 1000).toFixed(2)} s`,
-    );
+    console.log(`  Run ${run.run}: ${run.passed ? "PASS" : "FAIL"}`);
 
-    console.log(`    ${run.response}`);
+    for (const step of run.steps) {
+      if (step.pilot) console.log(`    Pilot> ${step.pilot}`);
+      if (step.trace) console.log(`      ${step.trace}`);
+      console.log(`    ATC> ${step.response}${step.proactive ? "  (unprompted)" : ""}`);
 
-    if (run.evaluation.failures.length > 0) {
-      for (const failure of run.evaluation.failures) {
-        console.log(`    ! ${failure}`);
-      }
+      step.evaluation?.failures.forEach((failure) =>
+        console.log(`      ! ${failure}`),
+      );
     }
   }
-}
-
-export interface ScenarioResult {
-  scenario: BenchmarkScenario;
-  runs: BenchmarkRun[];
 }
 
 const escapeTableCell = (text: string): string =>
   text.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
 
 export function buildMarkdownReport(results: ScenarioResult[]): string {
-  const lines: string[] = ["# Fly Tool ATC Benchmark", ""];
+  const allRuns = results.flatMap(({ runs }) => runs);
+  const totalPassed = allRuns.filter((run) => run.passed).length;
+  const timing = stageMedians(results);
+
+  const lines: string[] = [
+    "# Fly Tool ATC Benchmark",
+    "",
+    `Pipeline: classifier -> engine -> speech. Model: \`${MODEL}\`, thinking: \`${THINKING}\`.`,
+    "",
+    "## Summary",
+    "",
+    `- Scenario runs passed: ${totalPassed}/${allRuns.length} (${percent(totalPassed, allRuns.length)})`,
+    `- Pilot turns measured: ${timing.pilotTurns}`,
+    `- Median pilot turn: ${seconds(timing.turn)} (classifier ${seconds(timing.classify)}, speech ${seconds(timing.render)})`,
+    "",
+    "| Section | Scenario | Origin | Passed | Median pilot turn |",
+    "| --- | --- | --- | --- | --- |",
+  ];
 
   for (const { scenario, runs } of results) {
-    const passedRuns = runs.filter((run) => run.evaluation.passed).length;
-    const medianLatency = median(runs.map((run) => run.elapsedMs));
+    const passed = passedRuns(runs);
+    const latency = median(pilotSteps(runs).map((step) => step.elapsedMs ?? 0));
+
+    lines.push(
+      `| ${scenario.section} | ${scenario.name} | ${scenario.origin} | ${passed}/${runs.length} (${percent(passed, runs.length)}) | ${seconds(latency)} |`,
+    );
+  }
+
+  lines.push("");
+
+  for (const { scenario, runs } of results) {
+    const passed = passedRuns(runs);
 
     lines.push(`## ${scenario.name}`, "");
-    lines.push(`**Pilot:** "${scenario.pilotTransmission}"`, "");
     lines.push(
-      `Automated checks: ${passedRuns}/${runs.length} (${((passedRuns / runs.length) * 100).toFixed(0)}%) — Median latency: ${(medianLatency / 1000).toFixed(2)} s`,
+      `_${scenario.section} · ${scenario.origin} · ${passed}/${runs.length} (${percent(passed, runs.length)})_`,
       "",
     );
 
-    lines.push("| Run | Result | Latency | Response |");
-    lines.push("| --- | --- | --- | --- |");
-
-    for (const run of runs) {
-      const result = run.evaluation.passed ? "PASS" : "FAIL";
-
-      lines.push(
-        `| ${run.run} | ${result} | ${(run.elapsedMs / 1000).toFixed(2)}s | ${escapeTableCell(run.response)} |`,
-      );
-    }
-
-    lines.push("");
-
-    const failedRuns = runs.filter((run) => run.evaluation.failures.length > 0);
-
-    if (failedRuns.length > 0) {
-      for (const run of failedRuns) {
-        lines.push(`**Run ${run.run} failures:**`);
-        run.evaluation.failures.forEach((failure) =>
-          lines.push(`- ${failure}`),
-        );
-        lines.push("");
+    scenario.steps.forEach((step, index) => {
+      if (!step.pilot && !step.expect) {
+        return;
       }
-    }
+
+      const heading = step.pilot
+        ? `**Step ${index + 1} — Pilot:** "${step.pilot}"`
+        : `**Step ${index + 1} — no pilot transmission**`;
+
+      lines.push(heading, "", "| Run | Result | Pilot turn | ATC |", "| --- | --- | --- | --- |");
+
+      for (const run of runs) {
+        const result = run.steps[index];
+        const verdict = result.evaluation
+          ? result.evaluation.passed
+            ? "PASS"
+            : "FAIL"
+          : "-";
+        const latency =
+          result.elapsedMs === undefined ? "-" : seconds(result.elapsedMs);
+
+        lines.push(
+          `| ${run.run} | ${verdict} | ${latency} | ${escapeTableCell(result.response)} |`,
+        );
+      }
+
+      lines.push("");
+
+      for (const run of runs) {
+        const failures = run.steps[index].evaluation?.failures ?? [];
+
+        if (failures.length > 0) {
+          lines.push(`Run ${run.run} failures:`);
+          failures.forEach((failure) => lines.push(`- ${failure}`));
+          lines.push("");
+        }
+      }
+    });
   }
 
   return lines.join("\n");

@@ -1,20 +1,6 @@
-import { InferenceMetrics } from "../../ai/inferenceStats"
-import { AircraftState } from "../../domain/AircraftState";
-import { AtcState } from "../../domain/AtcState";
-
-export interface ConversationTurn {
-  pilot: string;
-  atc: string;
-}
-
-export interface BenchmarkScenario {
-  name: string;
-  aircraftState: AircraftState;
-  atcState: AtcState;
-  pilotTransmission: string;
-  expectations: BenchmarkExpectations;
-  initialConversation?: ConversationTurn[];
-}
+import { PilotRecord } from "../../domain/PilotRecord";
+import { StageTimings } from "../../pipeline/atcPipeline";
+import { RunwayFrameSpec } from "./telemetry";
 
 export interface BenchmarkExpectations {
   responseRequired: boolean;
@@ -27,10 +13,35 @@ export interface BenchmarkEvaluation {
   failures: string[];
 }
 
+export type ScenarioOrigin = "ported" | "adapted" | "new";
+
+export interface BenchmarkStep {
+  position: RunwayFrameSpec;
+  pilot?: string;
+  expect?: BenchmarkExpectations;
+}
+
+export interface BenchmarkScenario {
+  name: string;
+  section: string;
+  origin: ScenarioOrigin;
+  record?: PilotRecord;
+  trafficCount?: number;
+  steps: BenchmarkStep[];
+}
+
+export interface StepResult {
+  pilot?: string;
+  response: string;
+  proactive: boolean;
+  trace?: string;
+  evaluation?: BenchmarkEvaluation;
+  elapsedMs?: number;
+  timings?: StageTimings;
+}
+
 export interface BenchmarkRun {
   run: number;
-  response: string;
-  evaluation: BenchmarkEvaluation;
-  elapsedMs: number;
-  metrics: InferenceMetrics;
+  steps: StepResult[];
+  passed: boolean;
 }

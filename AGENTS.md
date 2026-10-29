@@ -47,13 +47,18 @@ doesn't have real situational grounding yet.
   against fixed `AircraftState`/`AtcState` fixtures in `src/lab/cases.ts` —
   no simulator required, useful for iterating on the prompt/knowledge base
   quickly.
-- `npm run lab:benchmark` — build + run `src/lab/benchmark/benchmark.ts`. Runs a
-  fixed scenario suite (`src/lab/benchmark/scenarios.ts`, roughly twenty
-  scenarios covering readbacks, traffic pattern, takeoff, landing) against
-  the model 3x each, evaluates each response with simple string checks
-  (`checks.ts`), and writes a markdown report to `/benchmark-results/`
-  (gitignored). Requires Ollama running locally with the configured `MODEL`
-  pulled; takes a few minutes.
+- `npm run lab:benchmark` — build + run `src/lab/benchmark/benchmark.ts`. The
+  end-to-end behavioral benchmark: each scenario in `scenarios.ts` (multi-step,
+  ~35 of them) runs 3x from a fresh state through the real pipeline
+  (classifier -> situation derivation -> engine -> speech), with telemetry
+  generated from runway-relative positions (`telemetry.ts`) so it is
+  geometrically consistent. Each step's response is checked with simple string
+  checks (`checks.ts`), and a markdown report with per-scenario pass rates and
+  per-stage latency is written to `/benchmark-results/` (gitignored). Needs
+  Ollama running with the configured `MODEL` pulled; takes several minutes.
+  Scenarios are tagged `ported` (original expectation kept), `adapted`
+  (original intent, but following the engine: a *requested* report gets the
+  next instruction, an unrequested one gets silence) or `new`.
 - `npm run lab:classify` — build + run `src/lab/classification/classification.js`.
   Experiment for the planned "language -> structured JSON -> code logic ->
   language" pipeline: runs labeled pilot transmissions
@@ -76,13 +81,6 @@ doesn't have real situational grounding yet.
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
   a temp directory. Exits non-zero on any failure.
-- `npm run lab:pipeline` — build + run `src/lab/pipeline/pipeline.js`. End to end
-  (classify -> derive situation -> engine -> render) over multi-step
-  scenarios with phase-consistent telemetry (`pipeline/telemetry.ts`). Many
-  scenarios are ported from the benchmark with their original expectations;
-  scenarios whose expectations were changed to follow the engine are tagged
-  `adapted` (a *requested* report gets the next instruction, an unrequested
-  one gets silence). Needs Ollama.
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -205,12 +203,17 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
     interactive `lab.ts` CLI.
   - `lab.ts` — interactive loop, same shape as `index.ts` but sourcing state
     from `cases.ts` instead of SimConnect.
-  - `benchmark/` — the behavioral benchmark harness:
+  - `benchmark/` — the end-to-end behavioral benchmark harness:
     - `benchmarkTypes.ts` — shared types (`BenchmarkScenario`,
-      `ConversationTurn`, `BenchmarkExpectations`, `BenchmarkRun`, ...).
+      `BenchmarkStep`, `BenchmarkExpectations`, `BenchmarkRun`, ...).
     - `scenarios.ts` — the test data. Pure data, no logic. Each scenario is
       a specific, narrow behavior claim, not a general aviation-competence
-      test.
+      test. Facts an expectation depends on (a clearance already issued, a
+      report already requested) are established by earlier steps.
+    - `telemetry.ts` — `telemetryAt` and the named `positions` (holding short,
+      lined up, downwind, final, ...) turned into consistent `AircraftState`.
+    - `records.ts` — `knownPilot`, a pilot record with prior visits/landings
+      for the memory scenarios.
     - `checks.ts` — the evaluator (`evaluateResponse`). Deliberately simple:
       `responseRequired` (must/must-not be `[NO RESPONSE]`),
       `requiredConcepts`/`forbiddenPatterns` (case-insensitive substrings).
@@ -229,15 +232,15 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   human is expected to read the printed/markdown response for anything
   subtler (that's why every run's response is shown, not just failures). If
   asked to make a scenario "catch" some new failure mode, prefer grounding
-  the scenario (add a fact to `situationContext` or `initialConversation`)
-  over adding a new kind of automated check.
+  the scenario (add an earlier step or a pilot record that establishes the
+  fact) over adding a new kind of automated check.
 - **Scenarios must be self-contained and grounded.** If an expectation
-  depends on a fact (e.g. "the aircraft is number one, so it should be
-  cleared to land"), that fact belongs in `situationContext`, not assumed.
-  If a scenario is a readback test, the instruction being read back needs to
-  actually be in `initialConversation` — a pilot line that merely *sounds*
-  like a readback with no prior ATC instruction in history doesn't test what
-  it claims to.
+  depends on a fact (e.g. "the aircraft was already cleared to land"), an
+  earlier step of the scenario has to establish it, not assume it. If a
+  scenario is a readback test, the clearance being read back has to actually
+  have been issued by the pipeline in a previous step — a pilot line that
+  merely *sounds* like a readback with nothing pending doesn't test what it
+  claims to.
 - **New concern → new file**, following the existing `src/ai/` split
   (per-job folders; within them prompt vs. model config vs. stats vs.
   knowledge loading). Don't let
@@ -258,6 +261,7 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
 
 There's no test framework. `npx tsc --noEmit` is the baseline check after
 any edit. For behavior changes to the ATC prompt or knowledge base,
-`npm run lab:chat` (single interaction, fast) or `npm run lab:benchmark` (full suite)
-are how to validate against the model — reading the printed responses
+`npm run lab:chat` (single interaction on the legacy single-call path), the stage labs
+(`lab:engine`, `lab:memory` need no model; `lab:classify`, `lab:render` do) or
+`npm run lab:benchmark` (full end-to-end suite) are how to validate against the model — reading the printed responses
 matters as much as the PASS/FAIL count.

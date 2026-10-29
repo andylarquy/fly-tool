@@ -39,11 +39,18 @@ export interface PipelineInput {
   pilotTransmission?: string;
 }
 
+export interface StageTimings {
+  classifyMs: number;
+  extractMs: number;
+  renderMs: number;
+}
+
 export interface PipelineTrace {
   situation: Situation;
   events: FlightEvent[];
   message?: PilotMessage;
   intents: AtcIntent[];
+  timings: StageTimings;
 }
 
 export interface PipelineTurn {
@@ -93,18 +100,23 @@ export const runPipelineTurn = async (
 
   let pilot: PilotInput = { status: "none" };
   let message: PilotMessage | undefined;
+  const timings: StageTimings = { classifyMs: 0, extractMs: 0, renderMs: 0 };
 
   if (pilotTransmission) {
+    const classifyStart = performance.now();
     const classification = await classifyPilotMessage({
       pilotTransmission,
       lastAtcTransmission: previous.lastAtcTransmission,
       runways: airport.runways.map((runway) => runway.designator),
     });
 
+    timings.classifyMs = performance.now() - classifyStart;
     message = classification.message;
 
     if (message && (message.type === "emergency" || previous.engine.emergency)) {
+      const extractStart = performance.now();
       const emergency = await extractEmergencyDetails(pilotTransmission);
+      timings.extractMs = performance.now() - extractStart;
       message = { ...message, emergency };
     }
 
@@ -126,6 +138,7 @@ export const runPipelineTurn = async (
     previous.engine,
   );
 
+  const renderStart = performance.now();
   const rendered = await renderTransmission({
     callsign,
     intents: decision.intents,
@@ -142,6 +155,12 @@ export const runPipelineTurn = async (
       situation,
       lastAtcTransmission: rendered?.text ?? previous.lastAtcTransmission,
     },
-    trace: { situation, events, message, intents: decision.intents },
+    trace: {
+      situation,
+      events,
+      message,
+      intents: decision.intents,
+      timings: { ...timings, renderMs: performance.now() - renderStart },
+    },
   };
 };
