@@ -111,6 +111,73 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
+    name: "A taxi readback without hold short is sent back",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23 via Charlie, Alpha, Bravo, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["say again", "readback"],
+          forbiddenPatterns: ["negative"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A wrong taxiway in the readback is corrected with the route",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23 via Charlie, Delta, Bravo, hold short runway 23, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["negative", "charlie, alpha, bravo"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A strict controller makes the pilot read back the whole route",
+    section: "Ground",
+    origin: "new",
+    record: knownPilot({ visits: 3 }),
+    trafficCount: 8,
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23 via Charlie, Bravo, hold short runway 23, LV-INQ.",
+        expect: { responseRequired: true, requiredConcepts: ["say again", "readback"] },
+      },
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23 via Charlie, Alpha, Bravo, hold short runway 23, LV-INQ.",
+        expect: { responseRequired: true, requiredConcepts: ["readback correct"] },
+      },
+    ],
+  },
+  {
+    name: "A relaxed controller accepts a sloppy taxi readback",
+    section: "Ground",
+    origin: "new",
+    record: knownPilot({ visits: 7 }),
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 23, LV-INQ.",
+        expect: silent,
+      },
+    ],
+  },
+  {
     name: "Taxi readback with the wrong runway is corrected",
     section: "Ground",
     origin: "new",

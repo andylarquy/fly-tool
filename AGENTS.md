@@ -178,7 +178,20 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   handoff belongs there); moving >120 ft off the route for 4 s re-plans from
   the current point and issues `off_route` (30 s cooldown); being on a runway
   in the `Taxiing` phase with no runway clearance gives `hold_position`
-  (20 s cooldown). Runway crossings: a runway other than the active one is
+  (20 s cooldown). Taxi readback fidelity (`taxiReadback.ts`): the pipeline
+  attaches the raw transcript to the classified message, and the engine
+  checks it against the route it issued (no model: it knows the answer, so it
+  looks for the expected phonetic names in order, accepts "Alfa"/"Alpha one"/bare
+  letters, ignores the pilot's own callsign even when spoken phonetically, and
+  flags phonetic words that are not on the route). A wrong runway is corrected
+  at every strictness; beyond that: strict wants the hold-short phrase and the
+  whole route ("say again, full readback" when incomplete), normal wants the
+  hold-short and no wrong names, relaxed accepts anything (a wrong turn is
+  caught later by the progress check). English only for now. Two guards around
+  it: a "say again" does not replace the instruction the pilot reads back
+  against in the classifier's context, and a taxi call that arrives while the
+  instruction awaits its readback and does not say "request" is read as the
+  readback (the 4B model often labels it a request). Runway crossings: a runway other than the active one is
   crossed as part of the route ("via Golf, cross runway 13, Golf"). The
   *active* runway never is: the first instruction ends with "hold short
   runway 23", and when the pilot is stationary at that point with no runway
@@ -211,6 +224,8 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   keeps the live record in `PipelineState`; the *caller* decides when to
   `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
+- `src/utils/phonetic.ts` — the phonetic alphabet (and its spelling variants), used
+  both to speak taxiways and to recognise them in a readback.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
   `msfs2024/taxiFacility.ts` is the pure half of reading an airport's taxi
   data: `buildTaxiNetwork` turns decoded `TAXI_POINT`/`TAXI_PATH`/`TAXI_NAME`/
