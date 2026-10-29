@@ -1,3 +1,8 @@
+import {
+  buildTaxiNetwork,
+  parkingName,
+  runwayNameFromFacility,
+} from "../../adapters/msfs2024/taxiFacility";
 import { Airport } from "../../domain/Airport";
 import { FlightPhase } from "../../domain/FlightPhase";
 import { PilotMessage } from "../../domain/PilotMessage";
@@ -18,10 +23,11 @@ import {
   planRouteFrom,
   sameRunway,
 } from "../../taxi/routing";
-import { pointFromRunwayFrame } from "../../utils/geo";
+import { distanceFeet, pointFromRunwayFrame } from "../../utils/geo";
 import { labAirport, labTaxiNetwork } from "../airports";
 import { positions, RunwayFrameSpec, telemetryAt } from "../benchmark/telemetry";
 import { label, msg } from "../engine/helpers";
+import { labFacilityData } from "./facilityFixture";
 
 const SETTLE_TICKS = 5;
 const TICK_MS = 1000;
@@ -143,6 +149,82 @@ function runRunways(): void {
   check(
     "The hold line nearest the runway's own threshold is the destination",
     holdShortPointFor(labTaxiNetwork, runway23)?.id === 5,
+  );
+}
+
+function runFacilityConversion(): void {
+  const network = buildTaxiNetwork(labFacilityData, labAirport.runways);
+  const byId = (id: number) => network.points.find((p) => p.id === id)!;
+
+  check(
+    "The parking spot that a path leads to is a point; the others are dropped",
+    network.parking.length === 1 && network.parking[0].name === "Ramp 1" && network.points.length === 11,
+    `${network.parking.length} parking, ${network.points.length} points`,
+  );
+  check(
+    "Closed, vehicle, road, painted-line and invalid paths are not segments",
+    network.segments.length === 10,
+    `${network.segments.length} segments`,
+  );
+
+  const parkingPoint = network.parking[0].pointId;
+  const toHold = planRoute(network, parkingPoint, 5);
+
+  check(
+    "A route from the parking spot ignores the shortcut paths",
+    spell(toHold?.legs) === "C+A+B",
+    spell(toHold?.legs),
+  );
+  check(
+    "The parking path does not create a phantom segment to the end of taxiway A",
+    !network.segments.some(
+      (s) => (s.from === 0 && s.to === 6) || (s.from === 6 && s.to === 0),
+    ) && Math.abs((toHold?.lengthFeet ?? 0) - 3_300) < 10,
+    `${toHold?.lengthFeet}`,
+  );
+  check(
+    "Positions survive the meters-from-reference conversion",
+    distanceFeet(byId(5).position, inFrame(0, 150)) < 1 &&
+      distanceFeet(byId(0).position, inFrame(2500, 900)) < 1,
+    `${distanceFeet(byId(5).position, inFrame(0, 150))}`,
+  );
+  check(
+    "Hold lines are labeled with the runway end they serve",
+    byId(5).holdShortRunway === "23" && byId(7).holdShortRunway === "05",
+    `${byId(5).holdShortRunway} ${byId(7).holdShortRunway}`,
+  );
+  check(
+    "An intersection hold line is labeled with a runway too",
+    byId(8).holdShortRunway !== undefined && byId(9).holdShortRunway !== undefined,
+  );
+  check(
+    "Ordinary taxi points have no hold label",
+    byId(0).holdShortRunway === undefined && byId(2).holdShortRunway === undefined,
+  );
+  check(
+    "A runway path becomes a crossing of that runway",
+    network.segments.some((s) => s.from === 8 && s.to === 9 && s.crossesRunway === "23"),
+  );
+  check(
+    "Runway names decode like the facility numbers them",
+    runwayNameFromFacility(23, 0) === "23" &&
+      runwayNameFromFacility(5, 1) === "05L" &&
+      runwayNameFromFacility(36, 2) === "36R" &&
+      runwayNameFromFacility(38, 0) === "NE",
+  );
+  check(
+    "Parking names combine name, number and suffix",
+    parkingName({ name: "Gate", number: 12, suffix: "A", biasXMeters: 0, biasZMeters: 0 }) === "Gate 12A" &&
+      parkingName({ name: "Ramp", number: 3, suffix: "", biasXMeters: 0, biasZMeters: 0 }) === "Ramp 3",
+  );
+
+  const converted: Airport = { ...labAirport, taxi: network };
+  const located = planRouteFrom(network, at(positions.rampSpot), holdShortPointFor(network, runway23)!.id);
+
+  check(
+    "The converted network answers a route request like the hand-built one",
+    spell(located?.legs) === "C+A+B" && converted.taxi === network,
+    spell(located?.legs),
   );
 }
 
@@ -360,6 +442,7 @@ function runScenarios(): void {
 
 runRouting();
 runRunways();
+runFacilityConversion();
 runScenarios();
 
 check(

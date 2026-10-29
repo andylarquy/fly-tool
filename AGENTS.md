@@ -212,6 +212,16 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
 - `src/adapters/` — simulator integration behind `SimulatorAdapter`.
+  `msfs2024/taxiFacility.ts` is the pure half of reading an airport's taxi
+  data: `buildTaxiNetwork` turns decoded `TAXI_POINT`/`TAXI_PATH`/`TAXI_NAME`/
+  `TAXI_PARKING` values (`RawAirportTaxiData`) into a `TaxiNetwork`. It keeps
+  taxi and path types, turns runway-type paths into crossings, drops closed,
+  vehicle, road and painted-line paths, treats a parking path's END as a
+  *parking index* (not a taxi point), turns the parking spots a path reaches
+  into points, and labels hold lines with the runway end they serve by
+  geometry. `lab/taxi/facilityFixture.ts` is a fixture with each of those
+  traps in it. The still-missing half is reading the raw SimConnect buffers
+  into `RawAirportTaxiData`.
 - `src/ai/` — everything that talks to Ollama, one folder per pipeline stage:
   - Shared at the root:
     - `modelConfig.ts` — single source of truth for `MODEL` and `THINKING`.
@@ -300,6 +310,25 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       convention (`<sanitized model>_thinking_<level>.md`, with `_1`, `_2`
       suffixes on collision).
     - `run.ts` — the runner.
+
+## Unverified against a real simulator
+
+Nothing has run against MSFS yet. These assumptions are built in and need
+checking on a sim machine (a wrong one fails quietly, not loudly):
+
+- Runway `HEADING` from facility data is true or magnetic (the geometry
+  assumes true).
+- `TAXI_POINT` `BIAS_X` is east and `BIAS_Z` is north, from the airport
+  reference point (`positionOf` in `taxiFacility.ts`).
+- `TAXI_PATH` type values: 1 taxi, 3 parking, 4 path are community-confirmed;
+  2 for runway is inferred (`PATH_TYPE`). Closed (5), vehicle (6), road (7)
+  and painted line (8) are excluded.
+- Parking paths: START is a taxi point and END is a parking index.
+- Hold lines have no runway in the data; the label comes from geometry
+  (nearest runway end within 400 ft of a centerline).
+- Parking names (`TAXI_PARKING` `NAME` enum) still need decoding to strings.
+- `ATC ID` returning the user aircraft's tail number; AI traffic fields;
+  `PLANE TOUCHDOWN NORMAL VELOCITY`; wind and pressure SimVars.
 
 ## Conventions worth preserving
 

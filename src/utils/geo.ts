@@ -107,3 +107,16 @@ export const distanceToSegmentFeet = (
 
   return Math.hypot(p.northFeet - t * s.northFeet, p.eastFeet - t * s.eastFeet);
 };
+
+export const FEET_PER_METER = 3.28084;
+
+export const pointFromOffsetFeet = (
+  origin: GeoPoint,
+  northFeet: number,
+  eastFeet: number,
+): GeoPoint => ({
+  latitude: origin.latitude + northFeet / FEET_PER_DEGREE_LATITUDE,
+  longitude:
+    origin.longitude +
+    eastFeet / (FEET_PER_DEGREE_LATITUDE * Math.cos(toRadians(origin.latitude))),
+});
