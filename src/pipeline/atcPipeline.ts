@@ -1,3 +1,4 @@
+import { extractEmergencyDetails } from "../ai/classifier/emergencyDetailsExtractor";
 import { classifyPilotMessage } from "../ai/classifier/pilotMessageClassifier";
 import { renderTransmission } from "../ai/speech/intentRenderer";
 import { createEngineState } from "../engine/clearances";
@@ -68,6 +69,12 @@ export const runPipelineTurn = async (
     });
 
     message = classification.message;
+
+    if (message && (message.type === "emergency" || previous.engine.emergency)) {
+      const emergency = await extractEmergencyDetails(pilotTransmission);
+      message = { ...message, emergency };
+    }
+
     pilot = message
       ? { status: "heard", message }
       : { status: "unintelligible" };

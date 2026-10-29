@@ -1,3 +1,4 @@
+import { extractEmergencyDetails } from "../../ai/classifier/emergencyDetailsExtractor";
 import { classifyPilotMessage } from "../../ai/classifier/pilotMessageClassifier";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { MODEL } from "../../ai/modelConfig";
@@ -5,6 +6,14 @@ import { labAirport } from "../airports";
 import { samples } from "./samples";
 
 const RUNS_PER_SAMPLE = 1;
+
+const EMERGENCY_KEYS = [
+  "urgency",
+  "nature",
+  "intention",
+  "soulsOnBoard",
+  "fuelEnduranceMinutes",
+] as const;
 
 const runways = labAirport.runways.map((runway) => runway.designator);
 
@@ -36,6 +45,8 @@ async function runClassification(): Promise<void> {
   let runwayCorrect = 0;
   let subjectCorrect = 0;
   let invalid = 0;
+  let emergencyChecks = 0;
+  let emergencyCorrect = 0;
   let unstable = 0;
 
   for (const sample of samples) {
@@ -76,6 +87,24 @@ async function runClassification(): Promise<void> {
       typeCorrect += message.type === expected.type ? 1 : 0;
       runwayCorrect += message.runway === expected.runway ? 1 : 0;
       subjectCorrect += message.subject === expected.subject ? 1 : 0;
+
+
+    }
+
+    if (expected.emergency) {
+      const details = await extractEmergencyDetails(sample.pilot);
+
+      for (const key of EMERGENCY_KEYS) {
+        const want = (expected.emergency as Record<string, unknown>)[key];
+        const got = (details as Record<string, unknown> | undefined)?.[key];
+        emergencyChecks++;
+        emergencyCorrect += got === want ? 1 : 0;
+
+        if (got !== want) {
+          console.log(`DIFF emergency "${sample.pilot}"`);
+          console.log(`     ${key}: expected ${want}, got ${got}`);
+        }
+      }
     }
 
     const allCorrect = runs.every(
@@ -97,6 +126,7 @@ async function runClassification(): Promise<void> {
   console.log(`Type:    ${percent(typeCorrect, total)}`);
   console.log(`Runway:  ${percent(runwayCorrect, total)}`);
   console.log(`Subject: ${percent(subjectCorrect, total)}`);
+  console.log(`Emergency details: ${percent(emergencyCorrect, emergencyChecks)}`);
   console.log(`Invalid output: ${invalid}`);
   console.log(`Samples with inconsistent runs: ${unstable}/${samples.length}`);
   console.log(`Median latency: ${(median(latencies) / 1000).toFixed(2)} s`);

@@ -10,7 +10,8 @@ const msg = (
   type: PilotMessage["type"],
   runway: string | null,
   subject: PilotMessage["subject"],
-): PilotMessage => ({ type, runway, subject });
+  emergency?: PilotMessage["emergency"],
+): PilotMessage => ({ type, runway, subject, emergency });
 
 export const samples: ClassificationSample[] = [
   {
@@ -157,15 +158,42 @@ export const samples: ClassificationSample[] = [
   },
   {
     pilot: "MAYDAY MAYDAY MAYDAY, LV-INQ, engine failure, 700 feet.",
-    expected: msg("emergency", null, "other"),
+    expected: msg("emergency", null, "other", { urgency: "mayday", nature: "engine_failure" }),
   },
   {
     pilot: "Pan-pan pan-pan pan-pan, LV-INQ, rough running engine, returning to the field.",
-    expected: msg("emergency", null, "other"),
+    expected: msg("emergency", null, "other", {
+      urgency: "pan_pan",
+      nature: "engine_failure",
+      intention: "land_at_airport",
+    }),
   },
   {
     pilot: "Tower, LV-INQ, we have smoke in the cockpit, declaring an emergency.",
-    expected: msg("emergency", null, "other"),
+    expected: msg("emergency", null, "other", { urgency: "mayday", nature: "fire" }),
+  },
+  {
+    pilot: "Returning to the field, LV-INQ.",
+    lastAtc: "LV-INQ, roger MAYDAY, engine failure. Say intentions.",
+    expected: msg("emergency", null, "other", { intention: "land_at_airport" }),
+  },
+  {
+    pilot: "Three souls on board, two hours of fuel, LV-INQ.",
+    lastAtc: "LV-INQ, say souls on board and fuel remaining.",
+    expected: msg("emergency", null, "other", { soulsOnBoard: 3, fuelEnduranceMinutes: 120 }),
+  },
+  {
+    pilot: "Landing straight ahead, LV-INQ.",
+    lastAtc: "LV-INQ, roger MAYDAY, fire. Say intentions.",
+    expected: msg("emergency", null, "other", { intention: "land_ahead" }),
+  },
+  {
+    pilot: "Mayday mayday mayday, LV-INQ, passenger unconscious, request priority landing.",
+    expected: msg("emergency", null, "landing", {
+      urgency: "mayday",
+      nature: "medical",
+      intention: "land_at_airport",
+    }),
   },
   {
     pilot: "Good morning, tower.",
