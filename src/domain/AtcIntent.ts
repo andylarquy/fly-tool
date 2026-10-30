@@ -1,6 +1,7 @@
 import { PatternSide } from "./Airport";
 import { ClearanceKind } from "./Clearance";
 import { EmergencyNature, EmergencyQuestion, EmergencyUrgency } from "./Emergency";
+import { ControllerPosition } from "./Frequency";
 import { FlightPhase } from "./FlightPhase";
 import { TaxiDestination, TaxiInstructionReason, TaxiLeg } from "./Taxi";
 import { Remark } from "./Remark";
@@ -45,6 +46,7 @@ export type AtcIntent =
       holdShort?: string;
       crossFirst?: string;
     }
+  | { type: "handoff"; to: ControllerPosition; frequencyMhz: number }
   | { type: "remark"; remark: Remark }
   | { type: "acknowledge"; kind: "readback_correct" | "courtesy" }
   | {

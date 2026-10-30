@@ -1,4 +1,5 @@
 import { AtcIntent } from "../../domain/AtcIntent";
+import { spokenFrequency } from "../../utils/frequency";
 import { spokenTaxiway } from "../../utils/phonetic";
 import { TaxiDestination, TaxiInstructionReason, TaxiLeg } from "../../domain/Taxi";
 import {
@@ -110,6 +111,11 @@ export const describeIntent = (intent: AtcIntent): string => {
         ["intent", "taxi_instruction"],
         ["lead_in", TAXI_LEAD_IN[intent.reason]],
         ["text", taxiSentence(intent.destination, intent.legs, intent.holdShort, intent.crossFirst)],
+      ]);
+    case "handoff":
+      return fields([
+        ["intent", "handoff"],
+        ["text", `Contact ${intent.to} ${spokenFrequency(intent.frequencyMhz)}.`],
       ]);
     case "remark":
       return fields([["intent", "remark"], ["kind", intent.remark.kind]]);

@@ -4,7 +4,7 @@ import { Strictness } from "../../domain/ControllerStyle";
 import { FlightEvent } from "../../domain/FlightEvent";
 import { FlightPhase } from "../../domain/FlightPhase";
 import { PilotMessage } from "../../domain/PilotMessage";
-import { labAirport } from "../airports";
+import { labAirportSingleController } from "../airports";
 import { aircraftIn, label, msg, situationIn } from "./helpers";
 
 type Heard = PilotMessage | "unintelligible";
@@ -212,7 +212,7 @@ function runEngineReplay(): void {
       const decision = decide(
         {
           aircraft: aircraftIn(step.phase),
-          airport: labAirport,
+          airport: labAirportSingleController,
           situation: situationIn(step.phase, step.atMs),
           style: { strictness: scenario.strictness ?? "normal" },
           events: step.events ?? [],

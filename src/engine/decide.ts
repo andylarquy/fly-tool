@@ -5,6 +5,7 @@ import { decideEvents } from "./decideEvents";
 import { decideTick } from "./decideTick";
 import { decidePilotMessage } from "./decidePilotMessage";
 import { ask } from "./intentBuilders";
+import { syncPosition } from "./positions";
 import { Decision, DecisionInput } from "./decisionTypes";
 
 export const decide = (
@@ -13,7 +14,7 @@ export const decide = (
 ): Decision => {
   const { pilot, events, ...ctx } = input;
   const intents: AtcIntent[] = [];
-  let state = previous;
+  let state = syncPosition(ctx, previous);
 
   const apply = (decision: Decision): void => {
     intents.push(...decision.intents);

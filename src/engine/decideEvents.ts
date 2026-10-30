@@ -4,6 +4,7 @@ import { FlightPhase } from "../domain/FlightPhase";
 import { isAirbornePhase } from "../situation/classifyPhase";
 import { findActive, withStatus } from "./clearances";
 import { Decision, DecisionContext } from "./decisionTypes";
+import { hasSeparatePositions } from "./positions";
 import { EngineState } from "../domain/EngineState";
 
 const LANDING_KINDS = ["land" as const, "touch_and_go" as const];
@@ -26,6 +27,10 @@ export const decideEvents = (
 
       case "touchdown":
         state = withStatus(state, ["land"], "completed");
+
+        if (hasSeparatePositions(ctx.airport) && state.position === "tower") {
+          state = { ...state, awaitingGroundHandoff: true };
+        }
 
         if (ctx.situation.phase === FlightPhase.LandingRoll) {
           intents.push({

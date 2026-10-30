@@ -86,6 +86,17 @@ export const labAirport: Airport = {
     },
   ],
   taxi: labTaxiNetwork,
+  frequencies: [
+    { type: "atis", frequencyMhz: 127.6, name: "Lab Field ATIS" },
+    { type: "ground", frequencyMhz: 121.9, name: "Lab Field Ground" },
+    { type: "tower", frequencyMhz: 118.1, name: "Lab Field Tower" },
+  ],
+};
+
+// An airport that reports no frequencies has one controller doing everything.
+export const labAirportSingleController: Airport = {
+  ...labAirport,
+  frequencies: undefined,
 };
 
 export const labTower: Facility = {

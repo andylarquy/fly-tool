@@ -21,6 +21,7 @@ import {
 import { findActive, withClearance, withStatus } from "./clearances";
 import { Decision, DecisionContext } from "./decisionTypes";
 import { say, silent } from "./intentBuilders";
+import { handOffTo, hasSeparatePositions } from "./positions";
 
 const OFF_ROUTE_FEET = 120;
 const OFF_ROUTE_CONFIRM_MS = 4_000;
@@ -97,6 +98,10 @@ export const decideTaxiRequest = (
 
   if (!network || !situation.onGround) {
     return say({ type: "query", query: "say_again" }, state);
+  }
+
+  if (hasSeparatePositions(airport) && state.position === "tower") {
+    return handOffTo(ctx, state, "ground");
   }
 
   const activeRunway = airport.runways.find((r) => r.designator === state.runway);
@@ -261,7 +266,16 @@ export const decideTaxiProgress = (
   const targetId = taxi.pointIds[taxi.pointIds.length - 1];
 
   if (!moving && distanceToPointFeet(network, targetId, aircraft) <= ARRIVED_FEET) {
-    return silent({ ...withStatus(state, ["taxi"], "completed"), taxi: undefined });
+    const arrived: EngineState = {
+      ...withStatus(state, ["taxi"], "completed"),
+      taxi: undefined,
+    };
+
+    return hasSeparatePositions(airport) &&
+      state.position === "ground" &&
+      taxi.destination.kind === "runway"
+      ? handOffTo(ctx, arrived, "tower")
+      : silent(arrived);
   }
 
   const off = distanceToRouteFeet(network, taxi.pointIds, aircraft);

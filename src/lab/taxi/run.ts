@@ -1,3 +1,4 @@
+import { buildFrequencies } from "../../adapters/msfs2024/frequencyFacility";
 import {
   buildTaxiNetwork,
   parkingName,
@@ -12,6 +13,7 @@ import { TaxiLeg } from "../../domain/Taxi";
 import { TaxiNetwork } from "../../domain/TaxiNetwork";
 import { decide } from "../../engine/decide";
 import { createEngineState } from "../../engine/engineState";
+import { hasSeparatePositions } from "../../engine/positions";
 import { deriveSituation } from "../../situation/deriveSituation";
 import {
   distanceToRouteFeet,
@@ -24,8 +26,9 @@ import {
   planRouteFrom,
   sameRunway,
 } from "../../taxi/routing";
+import { spokenFrequency } from "../../utils/frequency";
 import { distanceFeet, pointFromRunwayFrame } from "../../utils/geo";
-import { labAirport, labTaxiNetwork } from "../airports";
+import { labAirport, labAirportSingleController, labTaxiNetwork } from "../airports";
 import { positions, RunwayFrameSpec, telemetryAt } from "../benchmark/telemetry";
 import { label, msg } from "../engine/helpers";
 import { labFacilityData } from "./facilityFixture";
@@ -70,7 +73,7 @@ const crossRunwayNetwork: TaxiNetwork = {
   ],
 };
 
-const crossRunwayAirport: Airport = { ...labAirport, taxi: crossRunwayNetwork };
+const crossRunwayAirport: Airport = { ...labAirportSingleController, taxi: crossRunwayNetwork };
 
 function runRouting(): void {
   const route = (from: number, to: number) => planRoute(labTaxiNetwork, from, to);
@@ -153,6 +156,44 @@ function runRunways(): void {
   );
 }
 
+function runFrequencyConversion(): void {
+  const frequencies = buildFrequencies([
+    { type: 6, frequencyHz: 118_100_000, name: "Lab Field Tower" },
+    { type: 5, frequencyHz: 121_900_000, name: "Lab Field Ground" },
+    { type: 5, frequencyHz: 121_900_000, name: "Lab Field Ground" },
+    { type: 1, frequencyHz: 127_600_000, name: "" },
+    { type: 6, frequencyHz: 118_125_000, name: "Tower (8.33)" },
+    { type: 11, frequencyHz: 122_200_000, name: "FSS" },
+    { type: 0, frequencyHz: 123_000_000, name: "none" },
+    { type: 6, frequencyHz: 0, name: "empty" },
+  ]);
+
+  const summary = frequencies.map((f) => `${f.type}:${f.frequencyMhz}`).join(" ");
+
+  check(
+    "Frequencies are converted to megahertz, typed, and deduplicated",
+    summary === "tower:118.1 ground:121.9 atis:127.6 tower:118.125 other:122.2",
+    summary,
+  );
+  check(
+    "Entries with no type or no frequency are dropped",
+    !summary.includes("123") && frequencies.length === 5,
+  );
+  check(
+    "The ground and tower frequencies of the converted data make separate positions",
+    hasSeparatePositions({ ...labAirport, frequencies }),
+  );
+  check(
+    "A tower-only airport has one controller doing everything",
+    !hasSeparatePositions({ ...labAirport, frequencies: frequencies.filter((f) => f.type === "tower") }),
+  );
+  check("8.33 kHz channels keep their third decimal", spokenFrequency(118.125) === "118.125");
+  check(
+    "Frequencies are spoken with one decimal when they can",
+    spokenFrequency(118.1) === "118.1" && spokenFrequency(121.9) === "121.9" && spokenFrequency(118) === "118.0",
+  );
+}
+
 function runFacilityConversion(): void {
   const network = buildTaxiNetwork(labFacilityData, labAirport.runways);
   const byId = (id: number) => network.points.find((p) => p.id === id)!;
@@ -231,6 +272,7 @@ function runFacilityConversion(): void {
 
 interface Step {
   position: RunwayFrameSpec;
+  com1?: number;
   pilot?: PilotMessage;
   expect: string[];
   ticks?: number;
@@ -520,6 +562,90 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    name: "Taxi to the hold line ends with a handoff to tower, then line up",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.taxiingOnAlpha, expect: [] },
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
+    name: "Taxi to parking does not hand the pilot to tower",
+    airport: labAirport,
+    steps: [
+      { position: A.clearOfRunway, pilot: msg("request", null, "parking"), expect: ["taxi_instruction:request:Ramp 1:C"] },
+    ],
+  },
+  {
+    name: "Tower sends a pilot who needs to taxi to ground, who then gets the route",
+    airport: labAirport,
+    steps: [
+      { position: A.holdingShortFarEnd, pilot: msg("request", null, "takeoff"), expect: ["handoff:ground:121.9"] },
+      { position: A.holdingShortFarEnd, pilot: msg("request", null, "takeoff"), expect: ["taxi_instruction:request:runway 23:D+A+B:hold 23"] },
+    ],
+  },
+  {
+    name: "A taxi request made to tower is sent to ground",
+    airport: labAirport,
+    steps: [
+      { position: A.holdingShort, pilot: msg("request", null, "taxi"), expect: ["handoff:ground:121.9"] },
+    ],
+  },
+  {
+    name: "Calling ground from the hold line is sent to tower",
+    airport: labAirport,
+    steps: [
+      { position: A.rampSpot, expect: [] },
+      { position: A.holdingShort, pilot: msg("request", "23", "hold_short"), expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("request", "23", "hold_short"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
+    name: "Tuning tower is enough: no redirect when the radio says so",
+    airport: labAirport,
+    steps: [
+      { position: A.rampSpot, expect: [] },
+      { position: A.holdingShort, com1: 118.1, pilot: msg("request", "23", "hold_short"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
+    name: "A frequency that belongs to nobody here changes nothing",
+    airport: labAirport,
+    steps: [
+      { position: A.rampSpot, expect: [] },
+      { position: A.holdingShort, com1: 122.8, pilot: msg("request", "23", "hold_short"), expect: ["handoff:tower:118.1"] },
+    ],
+  },
+  {
+    name: "An emergency is never redirected",
+    airport: labAirport,
+    steps: [
+      { position: A.rampSpot, pilot: msg("emergency", null, "other"), expect: ["emergency_response:nature+intention"] },
+    ],
+  },
+  {
+    name: "After landing, the pilot is handed to ground once clear of the runway",
+    airport: labAirport,
+    steps: [
+      { position: A.final, pilot: msg("position_report", null, "final"), expect: ["issue_clearance:land"] },
+      { position: A.smoothFlare, expect: [] },
+      { position: A.landingRoll, expect: ["instruct:vacate_runway"] },
+      { position: A.clearOfRunway, expect: ["handoff:ground:121.9"] },
+      { position: A.clearOfRunway, pilot: msg("request", null, "parking"), expect: ["taxi_instruction:request:Ramp 1:C"] },
+    ],
+  },
+  {
+    name: "Without a ground frequency the tower covers the ground and nobody is handed off",
+    airport: { ...labAirport, frequencies: labAirport.frequencies?.filter((f) => f.type !== "ground") },
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: [] },
+      { position: A.holdingShort, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
     name: "A crossing of another runway is cleared as part of the route",
     airport: crossRunwayAirport,
     steps: [
@@ -534,15 +660,19 @@ const scenarios: Scenario[] = [
 
 function runScenarios(): void {
   for (const scenario of scenarios) {
-    const airport = scenario.airport ?? labAirport;
+    const airport = scenario.airport ?? labAirportSingleController;
     let engine = createEngineState(scenario.runway ?? "23");
     let situation: Situation | undefined;
     let nowMs = 0;
     const stepFailures: string[] = [];
 
-    const tick = (position: RunwayFrameSpec, pilot?: PilotMessage): string[] => {
+    const tick = (
+      position: RunwayFrameSpec,
+      pilot?: PilotMessage,
+      com1?: number,
+    ): string[] => {
       nowMs += TICK_MS;
-      const aircraft = at(position);
+      const aircraft = { ...at(position), com1FrequencyMhz: com1 };
       const derived = deriveSituation(
         { aircraft, airport, runway: engine.runway, observedAtMs: nowMs },
         situation,
@@ -569,11 +699,11 @@ function runScenarios(): void {
       const actual: string[] = [];
 
       for (let i = 0; i < (step.ticks ?? SETTLE_TICKS); i++) {
-        actual.push(...tick(step.position));
+        actual.push(...tick(step.position, undefined, step.com1));
       }
 
       if (step.pilot) {
-        actual.push(...tick(step.position, step.pilot));
+        actual.push(...tick(step.position, step.pilot, step.com1));
       }
 
       if (actual.join(",") !== step.expect.join(",")) {
@@ -590,6 +720,7 @@ function runScenarios(): void {
 runRouting();
 runRunways();
 runFacilityConversion();
+runFrequencyConversion();
 runScenarios();
 
 check(

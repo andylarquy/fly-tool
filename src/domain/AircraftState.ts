@@ -8,4 +8,5 @@ export interface AircraftState {
   bank: number;
   verticalSpeedFeetPerMinute: number;
   isOnGround: boolean;
+  com1FrequencyMhz?: number;
 }

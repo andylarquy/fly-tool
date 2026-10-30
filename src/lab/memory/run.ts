@@ -20,7 +20,7 @@ import {
   recordTouchdown,
   startVisit,
 } from "../../memory/recordKeeping";
-import { labAirport } from "../airports";
+import { labAirportSingleController } from "../airports";
 import { aircraftIn, label, msg, situationIn } from "../engine/helpers";
 
 const FACILITY = "ZZZZ-TWR";
@@ -230,7 +230,7 @@ function runEngineScenarios(): void {
       const decision = decide(
         {
           aircraft: aircraftIn(step.phase),
-          airport: labAirport,
+          airport: labAirportSingleController,
           situation: situationIn(step.phase, step.atMs),
           style,
           memory: { history: scenario.history, epochMs: NOW + step.atMs },

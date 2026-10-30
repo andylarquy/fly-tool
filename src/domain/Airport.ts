@@ -1,3 +1,4 @@
+import { AirportFrequency } from "./Frequency";
 import { GeoPoint } from "./GeoPoint";
 import { TaxiNetwork } from "./TaxiNetwork";
 
@@ -26,4 +27,5 @@ export interface Airport {
   airspace: Airspace;
   runways: Runway[];
   taxi?: TaxiNetwork;
+  frequencies?: AirportFrequency[];
 }

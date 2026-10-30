@@ -24,6 +24,7 @@ import {
   reportAfter,
 } from "./pattern";
 import { Decision, DecisionContext } from "./decisionTypes";
+import { handOffTo, hasSeparatePositions, positionForRequest } from "./positions";
 
 const MAX_READBACK_REJECTIONS = 2;
 const LANDING_KINDS = ["land" as const, "touch_and_go" as const];
@@ -342,6 +343,14 @@ export const decidePilotMessage = (
       },
       { ...withStatus(state, LANDING_KINDS, "cancelled"), expectedReport: "downwind" },
     );
+  }
+
+  const belongsTo = hasSeparatePositions(ctx.airport)
+    ? positionForRequest(ctx, state, message)
+    : undefined;
+
+  if (belongsTo && belongsTo !== state.position) {
+    return handOffTo(ctx, state, belongsTo);
   }
 
   switch (message.type) {

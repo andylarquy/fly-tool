@@ -4,6 +4,7 @@ import { findActive } from "./clearances";
 import { Decision, DecisionContext } from "./decisionTypes";
 import { decideTaxiProgress } from "./decideTaxi";
 import { clear } from "./intentBuilders";
+import { handOffTo } from "./positions";
 
 const CONTACT_TIMEOUT_MS = 30_000;
 
@@ -18,7 +19,19 @@ export const decideTick = (
     return progress;
   }
 
-  const state = progress.state;
+  let state = progress.state;
+
+  if (state.awaitingGroundHandoff) {
+    if (!situation.onGround) {
+      state = { ...state, awaitingGroundHandoff: undefined };
+    } else if (
+      !situation.onRunway &&
+      situation.phase !== FlightPhase.LandingRoll &&
+      state.position === "tower"
+    ) {
+      return handOffTo(ctx, state, "ground");
+    }
+  }
 
   if (
     situation.phase === FlightPhase.LinedUp &&
