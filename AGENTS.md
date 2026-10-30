@@ -86,7 +86,10 @@ doesn't have real situational grounding yet.
   the real situation derivation + engine over generated ground telemetry
   (request, readback, repeat, wrong turn, wrong hold line, runway entry,
   taxi to parking, crossing the active runway after a hold, crossing another
-  runway inside the route, and the fallback away from the network). Exits
+  runway inside the route, the fallback away from the network, and the
+  ground/tower handoffs, redirects and radio-tuning cases). The stage labs run
+  on `labAirportSingleController` (no frequencies) so they keep covering the
+  single-controller behavior; handoff scenarios use `labAirport`. Exits
   non-zero on any failure.
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
@@ -148,7 +151,8 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   `pattern.ts` (traffic-pattern leg helpers), `clearances.ts` (clearance
   helpers on `EngineState`), `engineState.ts` (`createEngineState`),
   `intentBuilders.ts` (`silent`/`say`/`ask`/`clear`), `decisionTypes.ts`,
-  `decideTaxi.ts` (ground guidance, below).
+  `decideTaxi.ts` (ground guidance, below), `positions.ts` (who the pilot is
+  talking to, below).
   `decide(input,
   state)` takes the classified `PilotMessage` (or none/unintelligible), the
   `Situation`, `FlightEvent`s and a `ControllerStyle`, and returns
@@ -200,6 +204,24 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   follows on its own. While that crossing clearance is in force, being on the
   runway does not trigger `hold_position`; it ends once the aircraft has been
   on the runway and left it. A hold line is the new `FlightPhase.HoldingShort`.
+  Ground and tower (`positions.ts`): an airport has *separate* controllers
+  only when `Airport.frequencies` has both a ground and a tower frequency;
+  otherwise one controller does everything (legacy behavior, also what an
+  airport with no frequency data gets). With both, `EngineState.position`
+  records who the pilot is with: set once from where the aircraft is (ramp or
+  taxiway: ground; hold line, runway or air: tower), and afterwards from the
+  radio when the telemetry carries `com1FrequencyMhz` and it matches one of
+  them (a frequency that matches neither is ignored, never silence). A request
+  that belongs to the other controller is answered with a `handoff` ("Contact
+  tower 118.1.") and the position changes; the pilot repeats it to the new
+  one. Taxi and parking belong to ground; a departure call (takeoff, line up,
+  hold short) belongs to tower only at the hold line of the *active* runway or
+  on it, and is a taxi matter anywhere else (so a pilot at the wrong hold line
+  is sent to ground, not bounced back); pattern and landing calls belong to
+  tower; emergencies, readbacks and questions are never redirected. Proactive
+  handoffs: arriving at a runway hold line after a taxi goes ground -> tower;
+  after a landing, once the aircraft is off the runway, tower -> ground
+  (`awaitingGroundHandoff`, set by the touchdown event).
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per
@@ -225,6 +247,7 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   keeps the live record in `PipelineState`; the *caller* decides when to
   `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
+- `src/utils/frequency.ts` — how a frequency is written (118.1, 118.125).
 - `src/utils/phonetic.ts` — the phonetic alphabet, used only to *speak* taxiways
   (and callsigns). Understanding what the pilot said is the model's job, not a
   word list's.
@@ -236,7 +259,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   vehicle, road and painted-line paths, treats a parking path's END as a
   *parking index* (not a taxi point), turns the parking spots a path reaches
   into points, and labels hold lines with the runway end they serve by
-  geometry. `lab/taxi/facilityFixture.ts` is a fixture with each of those
+  geometry. `frequencyFacility.ts` does the same for `FREQUENCY` entries
+  (`buildFrequencies`: type codes, Hz to MHz, deduplicated; types the engine
+  has no use for are kept as "other"). `lab/taxi/facilityFixture.ts` is a fixture with each of those
   traps in it. The still-missing half is reading the raw SimConnect buffers
   into `RawAirportTaxiData`.
 - `src/ai/` — everything that talks to Ollama, one folder per pipeline stage:
@@ -353,6 +378,14 @@ checking on a sim machine (a wrong one fails quietly, not loudly):
 - Hold lines have no runway in the data; the label comes from geometry
   (nearest runway end within 400 ft of a centerline).
 - Parking names (`TAXI_PARKING` `NAME` enum) still need decoding to strings.
+- `FREQUENCY` entries: the type codes (5 ground, 6 tower, ...) are documented,
+  but some airports have no ground or tower entry, and some towers are marked
+  as CTAF (a known navdata problem). With either missing the engine falls back
+  to one controller. Approach/departure/center/ATIS frequencies are decoded but
+  not used yet.
+- The tuned COM1 frequency SimVar (`COM ACTIVE FREQUENCY:1`, in MHz) is not
+  read yet; `AircraftState.com1FrequencyMhz` is optional and the engine only
+  uses it when present.
 - `ATC ID` returning the user aircraft's tail number; AI traffic fields;
   `PLANE TOUCHDOWN NORMAL VELOCITY`; wind and pressure SimVars.
 

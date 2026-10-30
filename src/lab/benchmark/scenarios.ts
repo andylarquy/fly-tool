@@ -226,13 +226,20 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
-    name: "Arriving at the hold line stays quiet, then line up and wait",
+    name: "Arriving at the hold line hands the pilot to tower, who lines them up",
     section: "Ground",
     origin: "new",
     steps: [
       requestTaxi,
       { position: positions.taxiingOnAlpha, expect: silent },
-      { position: positions.holdingShort, expect: silent },
+      {
+        position: positions.holdingShort,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["contact tower", "118.1"],
+          forbiddenPatterns: ["cleared", "taxi"],
+        },
+      },
       {
         position: positions.holdingShort,
         pilot: "Tower, holding short runway 23, ready for departure, LV-INQ.",
@@ -245,7 +252,7 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
-    name: "Holding short of the wrong runway is sent to the active one",
+    name: "Holding short of the wrong runway: tower sends the pilot to ground, who gives the route",
     section: "Ground",
     origin: "new",
     steps: [
@@ -254,8 +261,17 @@ export const scenarios: BenchmarkScenario[] = [
         pilot: "Tower, ready for departure, LV-INQ.",
         expect: {
           responseRequired: true,
+          requiredConcepts: ["contact ground", "121.9"],
+          forbiddenPatterns: ["line up", "cleared for takeoff", "taxi to"],
+        },
+      },
+      {
+        position: positions.holdingShortFarEnd,
+        pilot: "Ground, ready for departure, LV-INQ.",
+        expect: {
+          responseRequired: true,
           requiredConcepts: ["taxi to runway 23", "delta"],
-          forbiddenPatterns: ["line up", "cleared for takeoff"],
+          forbiddenPatterns: ["line up", "cleared for takeoff", "contact"],
         },
       },
     ],
@@ -313,6 +329,24 @@ export const scenarios: BenchmarkScenario[] = [
           responseRequired: true,
           requiredConcepts: ["hold position"],
           forbiddenPatterns: ["cleared"],
+        },
+      },
+    ],
+  },
+  {
+    name: "After landing, tower hands the pilot to ground once clear of the runway",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      clearedToLand,
+      { position: positions.smoothFlare },
+      { position: positions.landingRoll },
+      {
+        position: positions.clearOfRunway,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["contact ground", "121.9"],
+          forbiddenPatterns: ["taxi to"],
         },
       },
     ],
