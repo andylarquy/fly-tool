@@ -628,6 +628,23 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    name: "Reading back the handoff is silent, and the first call to the new controller is still answered",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("other", null, "frequency_change"), expect: [] },
+      { position: A.holdingShort, pilot: msg("other", null, "other"), expect: ["check_in_reply:tower:hold 23"] },
+    ],
+  },
+  {
+    name: "A frequency-change call when no handoff is pending is just silent",
+    airport: labAirport,
+    steps: [
+      { position: A.holdingShort, pilot: msg("other", null, "frequency_change"), expect: [] },
+    ],
+  },
+  {
     name: "Reporting holding short to tower at the line is a call for the departure clearance",
     airport: labAirport,
     steps: [

@@ -124,7 +124,7 @@ export const resolveDestination = (
   }
 
   if (confident) {
-    return { kind: "resolved", airport: toAirportRef(candidates[0].airport) };
+    return { kind: "resolved", airport: toAirportRef(candidates[0].airport), saidAs: spoken };
   }
 
   // A code spelled out as words ("Sierra Alpha Bravo Echo"): only tried when
@@ -133,7 +133,7 @@ export const resolveDestination = (
   const spelled = airports.byCode(initialsOf(spoken));
 
   if (spelled) {
-    return { kind: "resolved", airport: toAirportRef(spelled) };
+    return { kind: "resolved", airport: toAirportRef(spelled), saidAs: spoken };
   }
 
   if (candidates.length < 2) {

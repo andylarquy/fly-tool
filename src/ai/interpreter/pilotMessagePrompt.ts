@@ -37,6 +37,7 @@ subject:
 - final: the pilot is on final or short final.
 - go_around: going around or missed approach.
 - weather: wind, pressure, visibility, or other weather information.
+- frequency_change: the pilot is switching to, or reading back an instruction to switch to, another controller or frequency ("contact tower 118.1", "going to tower", "switching to ground").
 - other: anything that fits none of the above, such as the active runway, acknowledgements, greetings.
 
 runwayQuote: the exact words from the PILOT TRANSMISSION in which the pilot names a runway ("runway 05", "land on 23", "pista 21"). Use an empty string if the pilot names no runway. Never invent words.`;

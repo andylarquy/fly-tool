@@ -1,4 +1,5 @@
 import { Runway } from "../domain/Airport";
+import { ClearanceKind } from "../domain/Clearance";
 import { EngineState } from "../domain/EngineState";
 import { FlightPhase } from "../domain/FlightPhase";
 import { PilotMessage } from "../domain/PilotMessage";
@@ -6,6 +7,7 @@ import {
   findActive,
   findPendingReadback,
   kindsForSubject,
+  reissue,
   withAcknowledged,
   withClearance,
   withStatus,
@@ -42,20 +44,40 @@ const runwayOf = ({ airport }: DecisionContext, state: EngineState): Runway => {
   return runway;
 };
 
+const repeatClearance = (
+  state: EngineState,
+  kinds: ClearanceKind[],
+  nowMs: number,
+): Decision | undefined => {
+  const repeated = reissue(state, kinds, nowMs);
+
+  return repeated.clearance
+    ? say(
+        {
+          type: "issue_clearance",
+          clearance: repeated.clearance.kind,
+          runway: repeated.clearance.runway,
+        },
+        repeated.state,
+      )
+    : undefined;
+};
+
 const requestDeparture = (
   ctx: DecisionContext,
   state: EngineState,
 ): Decision => {
   const { situation } = ctx;
 
-  if (findActive(state, ["takeoff"])) {
-    return silent(state);
+  const takeoffAgain = repeatClearance(state, ["takeoff"], situation.observedAtMs);
+
+  if (takeoffAgain) {
+    return takeoffAgain;
   }
 
   const lineUp = (): Decision =>
-    findActive(state, ["line_up_and_wait"])
-      ? silent(state)
-      : clear(state, "line_up_and_wait", situation.observedAtMs);
+    repeatClearance(state, ["line_up_and_wait"], situation.observedAtMs) ??
+    clear(state, "line_up_and_wait", situation.observedAtMs);
 
   if (situation.phase !== FlightPhase.LinedUp && isAtActiveHoldLine(ctx, state)) {
     return lineUp();
@@ -109,8 +131,10 @@ const directArrival = (
 ): Decision => {
   const { phase, onGround, observedAtMs } = ctx.situation;
 
-  if (wantsLanding && findActive(state, LANDING_KINDS)) {
-    return silent(state);
+  const landingAgain = wantsLanding ? repeatClearance(state, [...LANDING_KINDS], observedAtMs) : undefined;
+
+  if (landingAgain) {
+    return landingAgain;
   }
 
   if (wantsLanding && (phase === FlightPhase.Base || phase === FlightPhase.Final)) {
@@ -306,7 +330,7 @@ const decidePositionReport = (
 };
 
 const decideQuestion = (
-  { aircraft }: DecisionContext,
+  { aircraft, situation }: DecisionContext,
   state: EngineState,
   message: PilotMessage,
 ): Decision => {
@@ -328,6 +352,21 @@ const decideQuestion = (
     case "taxi":
     case "parking":
       return repeatTaxiInstruction(state, "repeat");
+    case "takeoff":
+    case "line_up":
+    case "landing": {
+      const kinds: ClearanceKind[] =
+        message.subject === "landing"
+          ? ["land", "touch_and_go"]
+          : message.subject === "line_up"
+            ? ["line_up_and_wait", "takeoff"]
+            : ["takeoff", "line_up_and_wait"];
+
+      return (
+        repeatClearance(state, kinds, situation.observedAtMs) ??
+        say({ type: "unable", reason: "no_information" }, state)
+      );
+    }
     default:
       return say({ type: "unable", reason: "no_information" }, state);
   }
@@ -345,6 +384,43 @@ const isAtActiveHoldLine = (ctx: DecisionContext, state: EngineState): boolean =
     ctx.aircraft.isOnGround &&
     ctx.aircraft.groundSpeed < STOPPED_KNOTS &&
     holdingShortRunway(ctx.airport.taxi, ctx.aircraft) === state.runway);
+
+const REMINDER_SUBJECTS: Record<string, PilotMessage["subject"][]> = {
+  takeoff: ["takeoff", "line_up", "hold_short"],
+  line_up_and_wait: ["line_up", "takeoff", "hold_short"],
+};
+
+// Subjects the classifier may file under "readback" when the pilot is really
+// saying where they are ("currently lined up on 23" after being cleared for
+// takeoff). They are not a readback of that clearance, so they are not "wrong".
+const POSITION_STATEMENTS_FILED_AS_READBACKS: Record<string, PilotMessage["subject"][]> = {
+  takeoff: ["line_up"],
+};
+
+// A takeoff or line-up clearance the pilot has not read back, and the pilot
+// goes on talking about being ready, lined up or holding short: they did not
+// copy it. Landing is left alone on purpose, because reporting "short final"
+// after being cleared to land is normal and needs no repeat.
+const remindUnreadClearance = (
+  ctx: DecisionContext,
+  state: EngineState,
+  message: PilotMessage,
+): Decision | undefined => {
+  const pending = findPendingReadback(state);
+
+  if (
+    !pending ||
+    (message.type === "readback" &&
+      !(POSITION_STATEMENTS_FILED_AS_READBACKS[pending.kind] ?? []).includes(message.subject)) ||
+    message.type === "request" ||
+    message.type === "emergency" ||
+    !(REMINDER_SUBJECTS[pending.kind] ?? []).includes(message.subject)
+  ) {
+    return undefined;
+  }
+
+  return repeatClearance(state, [pending.kind], ctx.situation.observedAtMs);
+};
 
 const RUNWAY_CLEARANCES = ["line_up_and_wait", "takeoff", "land", "touch_and_go"] as const;
 
@@ -442,6 +518,12 @@ export const decidePilotMessage = (
     return decideEmergency(ctx, state, message);
   }
 
+  // Reading back "contact tower" is said to the controller being left. It is not
+  // the first call to the new one, which is still to come.
+  if (message.subject === "frequency_change" && checkIn) {
+    return silent({ ...state, awaitingCheckIn: checkIn });
+  }
+
   if (message.subject === "go_around") {
     return say(
       {
@@ -471,6 +553,12 @@ export const decidePilotMessage = (
   }
 
   state = intake.state;
+
+  const reminder = remindUnreadClearance(ctx, state, message);
+
+  if (reminder) {
+    return reminder;
+  }
 
   const linedUpCall = decideLinedUpCall(ctx, state, message);
 

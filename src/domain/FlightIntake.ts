@@ -9,7 +9,7 @@ export interface AirportRef {
 }
 
 export type DestinationJudgement =
-  | { kind: "resolved"; airport: AirportRef }
+  | { kind: "resolved"; airport: AirportRef; saidAs?: string }
   | { kind: "ambiguous"; options: AirportRef[] }
   | { kind: "unknown"; text: string }
   | { kind: "unresolvable"; text: string };

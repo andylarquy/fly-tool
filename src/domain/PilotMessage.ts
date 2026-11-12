@@ -24,6 +24,7 @@ export const PILOT_MESSAGE_SUBJECTS = [
   "final",
   "go_around",
   "weather",
+  "frequency_change",
   "other",
 ] as const;
 

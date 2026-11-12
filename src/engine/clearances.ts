@@ -65,3 +65,27 @@ export const withAcknowledged = (
     c === pending ? { ...c, status: "acknowledged" } : c,
   ),
 });
+
+// The pilot did not copy a clearance (asked for it again, or went on without
+// reading it back): say it again, and expect the readback again.
+export const reissue = (
+  state: EngineState,
+  kinds: ClearanceKind[],
+  nowMs: number,
+): { state: EngineState; clearance?: Clearance } => {
+  const active = findActive(state, kinds);
+
+  if (!active) {
+    return { state };
+  }
+
+  const repeated: Clearance = { ...active, issuedAtMs: nowMs, status: "issued" };
+
+  return {
+    state: {
+      ...state,
+      clearances: state.clearances.map((c) => (c === active ? repeated : c)),
+    },
+    clearance: repeated,
+  };
+};

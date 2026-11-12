@@ -601,15 +601,18 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
-    name: "A repeated request does not repeat the clearance",
+    name: "Asking again for a clearance already given hears it repeated",
     section: "Departure",
-    origin: "new",
+    origin: "adapted",
     steps: [
       clearedForTakeoff,
       {
         position: positions.linedUp,
         pilot: "Tower, lined up runway 23, ready for departure, LV-INQ.",
-        expect: silent,
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["cleared for takeoff", "23"],
+        },
       },
     ],
   },

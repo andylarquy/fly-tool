@@ -103,7 +103,7 @@ const scenarios: Scenario[] = [
     name: "IFR volunteered unprompted is refused at once, and a full answer later completes the plan",
     steps: [
       { pilot: answer(judged({ rules: "IFR" })), expect: ["unable:ifr_not_available", ASK_BOTH] },
-      { pilot: answer(judged({ destination: { kind: "resolved", airport: HARBOR }, rules: "VFR" })), expect: [] },
+      { pilot: answer(judged({ destination: { kind: "resolved", airport: HARBOR }, rules: "VFR" })), expect: ["flight_plan_accepted:Harbor Field"] },
       { pilot: takeoffCall, expect: [LINE_UP] },
     ],
   },
@@ -160,6 +160,21 @@ const scenarios: Scenario[] = [
     steps: [
       { pilot: takeoffCall, expect: [ASK_BOTH] },
       { pilot: answer(judged({ destination: { kind: "unresolvable", text: "Ezeiza" }, rules: "VFR" })), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "A whole plan given on its own is acknowledged in the pilot's own words",
+    steps: [
+      {
+        pilot: answer(judged({ destination: { kind: "resolved", airport: HARBOR, saidAs: "Harbor" }, rules: "VFR" })),
+        expect: ["flight_plan_accepted:Harbor"],
+      },
+    ],
+  },
+  {
+    name: "A local plan given on its own is acknowledged as local",
+    steps: [
+      { pilot: answer(judged({ local: true, rules: "VFR" })), expect: ["flight_plan_accepted:local"] },
     ],
   },
   {
@@ -251,7 +266,7 @@ const scenarios: Scenario[] = [
     name: "A destination given before being asked is remembered, and only the rules are asked",
     steps: [
       { pilot: answer(judged({ destination: { kind: "resolved", airport: HARBOR } })), expect: ["intake_question:rules"] },
-      { pilot: answer(judged({ rules: "VFR" })), expect: [] },
+      { pilot: answer(judged({ rules: "VFR" })), expect: ["flight_plan_accepted:Harbor Field"] },
       { pilot: takeoffCall, expect: [LINE_UP] },
     ],
   },
@@ -259,7 +274,7 @@ const scenarios: Scenario[] = [
     name: "Once complete the flight plan is never asked again",
     steps: [
       { pilot: heard(takeoffCall, judged({ destination: { kind: "resolved", airport: HARBOR }, rules: "VFR" })), expect: [LINE_UP] },
-      { pilot: takeoffCall, expect: [] },
+      { pilot: takeoffCall, expect: [LINE_UP] },
     ],
   },
 ];

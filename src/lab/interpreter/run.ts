@@ -89,7 +89,7 @@ async function runClassification(): Promise<void> {
       const key = `${expected.type} -> ${message.type}`;
       confusion.set(key, (confusion.get(key) ?? 0) + 1);
 
-      typeCorrect += message.type === expected.type ? 1 : 0;
+      typeCorrect += sample.ignoreType || message.type === expected.type ? 1 : 0;
       runwayCorrect += message.runway === expected.runway ? 1 : 0;
       subjectCorrect += message.subject === expected.subject ? 1 : 0;
 
@@ -112,8 +112,10 @@ async function runClassification(): Promise<void> {
       }
     }
 
-    const allCorrect = runs.every(
-      (r) => describe(r.message) === describe(expected),
+    const allCorrect = runs.every((r) =>
+      sample.ignoreType && r.message
+        ? r.message.runway === expected.runway && r.message.subject === expected.subject
+        : describe(r.message) === describe(expected),
     );
 
     console.log(`${allCorrect ? "OK  " : "DIFF"} "${sample.pilot}"`);

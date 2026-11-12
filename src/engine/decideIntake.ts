@@ -38,7 +38,7 @@ const applyDestination = (
         intake: {
           ...intake,
           destination: {
-            name: here ? ctx.airport.name : judgement.airport.name,
+            name: here ? ctx.airport.name : (judgement.saidAs ?? judgement.airport.name),
             id: judgement.airport.id,
             position: judgement.airport.position,
             ...(here ? { local: true } : {}),
@@ -175,7 +175,23 @@ export const applyIntake = (
   }
 
 
-  return deferred
-    ? { state: rest, decision: replay(rest, deferred) }
-    : { state: rest, decision: { intents: [], state: rest } };
+  if (deferred) {
+    return { state: rest, decision: replay(rest, deferred) };
+  }
+
+  // The plan came on its own, with nothing held back to answer: acknowledge
+  // it, as a controller would, instead of leaving the pilot in silence.
+  return {
+    state: rest,
+    decision: {
+      intents: [
+        {
+          type: "flight_plan_accepted",
+          destination: intake.destination?.name ?? "",
+          local: intake.destination?.local === true,
+        },
+      ],
+      state: rest,
+    },
+  };
 };

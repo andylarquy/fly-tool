@@ -4,6 +4,8 @@ export interface ClassificationSample {
   pilot: string;
   lastAtc?: string;
   expected: PilotMessage;
+  // The engine decides from the subject alone, so the type is not scored.
+  ignoreType?: boolean;
 }
 
 const msg = (
@@ -288,4 +290,11 @@ export const samples: ClassificationSample[] = [
     lastAtc: "LV-INQ, wind two three zero at eight knots.",
     expected: msg("other", null, "other"),
   },
+  { pilot: "Going to tower 118.1, see you man", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("readback", null, "frequency_change"), ignoreType: true },
+  { pilot: "Contact tower 118.1, LV-INQ.", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("readback", null, "frequency_change"), ignoreType: true },
+  { pilot: "Contacting tower on 118.1, LV-INQ.", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("readback", null, "frequency_change"), ignoreType: true },
+  { pilot: "Switching to ground, good day, LV-INQ.", lastAtc: "LV-INQ, Contact ground 121.9.", expected: msg("readback", null, "frequency_change"), ignoreType: true },
+  { pilot: "Pasamos a torre en 118.1, LV-INQ.", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("readback", null, "frequency_change"), ignoreType: true },
+  { pilot: "Tower, LV-INQ, holding short runway 23.", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("position_report", "23", "hold_short") },
+  { pilot: "Tower, LV-INQ, good morning.", lastAtc: "LV-INQ, Contact tower 118.1.", expected: msg("other", null, "other") },
 ];

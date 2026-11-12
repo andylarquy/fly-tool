@@ -157,6 +157,11 @@ export const describeIntent = (intent: AtcIntent): string => {
         ["intent", "intake_question"],
         ["text", INTAKE_QUESTION[intent.ask]],
       ]);
+    case "flight_plan_accepted":
+      return fields([
+        ["intent", "flight_plan_accepted"],
+        ["text", intent.local ? "Roger, VFR, local flight." : `Roger, VFR to ${intent.destination}.`],
+      ]);
     case "intake_clarify":
       return fields([
         ["intent", "intake_clarify"],

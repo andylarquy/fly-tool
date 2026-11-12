@@ -288,6 +288,21 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   authoritative: the classifier's subject and runway do not decide "wrong
   clearance" (it once filed a correct taxi readback under "line up" and got a
   false "Negative").
+  Handoff readbacks and the flight plan: a pilot repeating "contact tower
+  118.1" is classified with the subject `frequency_change` and answered with
+  silence (the check-in flag stays, so the first real call on the new
+  frequency is still answered). When the intake completes with no held-back
+  request, the controller acknowledges the plan ("Roger, VFR to Mendoza.",
+  `flight_plan_accepted`), using the destination as the pilot said it
+  (`saidAs`), not the directory's long official name.
+  Repeated clearances: a clearance still active (takeoff, line up, landing)
+  is repeated, not met with silence, when the pilot asks for it again or asks
+  a question about it (`reissue` in `clearances.ts`; a repeat of a landing
+  request included). A pending takeoff/line-up clearance the pilot has not
+  read back is repeated when the pilot talks about the same thing without
+  asking (`remindUnreadClearance`; landing is left out, a final report is not
+  a request). A "lined up" statement the classifier filed as a readback of a
+  pending takeoff clearance is a reminder case, not a wrong readback.
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per

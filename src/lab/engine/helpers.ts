@@ -46,6 +46,8 @@ export const label = (intent: AtcIntent): string => {
     }
     case "intake_question":
       return `intake_question:${intent.ask}`;
+    case "flight_plan_accepted":
+      return `flight_plan_accepted:${intent.local ? "local" : intent.destination}`;
     case "intake_clarify":
       return `intake_clarify:${intent.options.join("|")}`;
     case "check_in_reply":

@@ -47,10 +47,69 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
-    name: "Pilot already lined up asks for takeoff",
+    name: "Pilot already lined up asks for takeoff, and asking again hears the clearance repeated",
     steps: [
       { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
-      { atMs: 2000, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: [] },
+      { atMs: 2000, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "A clearance that was read back is repeated when asked for again",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 2000, phase: P.LinedUp, pilot: msg("readback", "23", "takeoff"), expect: [] },
+      { atMs: 9000, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "Asking about a takeoff already cleared repeats the clearance; asking when nothing is cleared is unable",
+    steps: [
+      { atMs: 0, phase: P.Stationary, pilot: msg("question", null, "takeoff"), expect: ["unable:no_information"] },
+      { atMs: 2000, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 4000, phase: P.LinedUp, pilot: msg("question", null, "takeoff"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "Going on about being lined up without having read the takeoff clearance back repeats it",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 3000, phase: P.LinedUp, pilot: msg("position_report", "23", "line_up"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "A 'lined up' statement the classifier filed as a readback repeats the takeoff clearance, without a Negative",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 3000, phase: P.LinedUp, pilot: msg("readback", "23", "line_up"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "A real readback of the wrong clearance is still corrected",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 3000, phase: P.LinedUp, pilot: msg("readback", "23", "landing"), expect: ["correct_readback"] },
+    ],
+  },
+  {
+    name: "Once the takeoff clearance is read back, a position report is left alone",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 2000, phase: P.LinedUp, pilot: msg("readback", "23", "takeoff"), expect: [] },
+      { atMs: 5000, phase: P.LinedUp, pilot: msg("position_report", "23", "line_up"), expect: [] },
+    ],
+  },
+  {
+    name: "Reporting final after the landing clearance is not repeated back at the pilot",
+    steps: [
+      { atMs: 0, phase: P.Final, pilot: msg("position_report", null, "final"), expect: ["issue_clearance:land"] },
+      { atMs: 8000, phase: P.Final, pilot: msg("position_report", null, "final"), expect: [] },
+    ],
+  },
+  {
+    name: "A request for landing already cleared repeats the clearance",
+    steps: [
+      { atMs: 0, phase: P.Final, pilot: msg("position_report", null, "final"), expect: ["issue_clearance:land"] },
+      { atMs: 8000, phase: P.Final, pilot: msg("request", "23", "landing"), expect: ["issue_clearance:land"] },
     ],
   },
   {

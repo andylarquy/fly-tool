@@ -40,7 +40,7 @@ PHRASEBOOK (intent -> standard form, written without the callsign; always put th
 - acknowledge_readback_correct: "Readback correct."
 - acknowledge_courtesy: a very short courteous reply such as "Roger."
 - unable: if text is given write it exactly, otherwise "Unable."
-- intake_question, intake_clarify: write the text exactly as given.
+- intake_question, intake_clarify, flight_plan_accepted: write the text exactly as given.
 - emergency_response: "Roger, <urgency>, <nature>." Skip the nature when it is not given. Then write the questions text exactly as given. When questions=none, write nothing more.
 
 STYLE
