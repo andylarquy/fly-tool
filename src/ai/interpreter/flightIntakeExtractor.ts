@@ -1,15 +1,17 @@
 import ollama from "ollama";
 import { MODEL, THINKING } from "../modelConfig";
 import {
-  FLIGHT_INTAKE_SCHEMA,
+  buildFlightIntakeSchema,
   FLIGHT_INTAKE_SYSTEM_PROMPT,
   NOT_STATED,
+  OPTIONS_PROMPT,
 } from "./flightIntakePrompt";
 
 export interface FlightIntakeWords {
   destinationText?: string;
   rules?: "VFR" | "IFR";
   local: boolean;
+  choice?: number;
 }
 
 const squash = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
@@ -50,6 +52,7 @@ const parse = (
   raw: string,
   transcript: string,
   callsign?: string,
+  optionCount = 0,
 ): FlightIntakeWords | undefined => {
   try {
     const fields = JSON.parse(raw) as Record<string, unknown>;
@@ -68,6 +71,9 @@ const parse = (
       ...(fields.rules === "vfr" ? { rules: "VFR" as const } : {}),
       ...(fields.rules === "ifr" ? { rules: "IFR" as const } : {}),
       local: fields.scope === "local",
+      ...(optionCount > 0 && typeof fields.choice === "string" && /^\d+$/.test(fields.choice) && Number(fields.choice) <= optionCount
+        ? { choice: Number(fields.choice) }
+        : {}),
     };
   } catch {
     return undefined;
@@ -78,20 +84,28 @@ export const extractFlightIntake = async (
   transcript: string,
   callsign?: string,
   lastAtcTransmission?: string,
+  options: string[] = [],
 ): Promise<FlightIntakeWords | undefined> => {
   const response = await ollama.chat({
     model: MODEL,
     messages: [
-      { role: "system", content: FLIGHT_INTAKE_SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: FLIGHT_INTAKE_SYSTEM_PROMPT + (options.length > 0 ? OPTIONS_PROMPT : ""),
+      },
       {
         role: "user",
-        content: `\naircraft callsign (never part of the destination): ${callsign ?? "none"}\n\nLAST ATC TRANSMISSION\n${lastAtcTransmission ?? "none"}\n\nPILOT TRANSMISSION\n${transcript}\n`,
+        content: `\naircraft callsign (never part of the destination): ${callsign ?? "none"}\n\nLAST ATC TRANSMISSION\n${lastAtcTransmission ?? "none"}\n${
+          options.length > 0
+            ? `\nOPTIONS\n${options.map((name, index) => `${index + 1}. ${name}`).join("\n")}\n`
+            : ""
+        }\nPILOT TRANSMISSION\n${transcript}\n`,
       },
     ],
-    format: FLIGHT_INTAKE_SCHEMA,
+    format: buildFlightIntakeSchema(options.length),
     think: THINKING,
     options: { temperature: 0 },
   });
 
-  return parse(response.message.content, transcript, callsign);
+  return parse(response.message.content, transcript, callsign, options.length);
 };

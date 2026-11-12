@@ -106,6 +106,14 @@ export const readbackSamples: ReadbackSample[] = [
     taxiways: CAB, holdShort: "23", expected: verdict(false, false, []),
   },
   {
+    transcript: "Taxi to holding point 23 via Charlie, Alpha, Bravo, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "Taxi to hold 23 via Charlie, Alpha, Bravo, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
     transcript: "Taxiing to hold short of runway 21 via Charli, Alpha, Bravo, LV-INQ.",
     taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
   },

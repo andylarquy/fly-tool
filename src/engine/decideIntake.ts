@@ -43,11 +43,15 @@ const applyDestination = (
             position: judgement.airport.position,
             ...(here ? { local: true } : {}),
           },
+          options: undefined,
         },
       };
     }
     case "ambiguous":
-      return { intake, clarify: judgement.options.map((option) => option.name) };
+      return {
+        intake: { ...intake, options: judgement.options },
+        clarify: judgement.options.map((option) => option.name),
+      };
     case "unresolvable":
       return { intake: { ...intake, destination: { name: judgement.text } } };
     // A name we cannot place is asked for once more. Said again the same way,

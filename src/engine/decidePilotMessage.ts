@@ -215,9 +215,15 @@ const decideReadback = (
     return silent(state);
   }
 
-  const expectedKinds = kindsForSubject(message.subject);
+  // For a taxi instruction the verifier has compared the pilot's own words with
+  // it, runway included. The classifier's subject and runway are a guess at
+  // the same thing (it once filed a correct taxi readback under "line up") and
+  // must not overrule it.
+  const verified = pending.kind === "taxi" && message.taxiReadback !== undefined;
+  const expectedKinds = verified ? undefined : kindsForSubject(message.subject);
   const wrongClearance = expectedKinds && !expectedKinds.includes(pending.kind);
   const wrongRunway =
+    !verified &&
     message.runway !== null &&
     pending.runway !== "" &&
     message.runway !== pending.runway;
@@ -340,6 +346,34 @@ const isAtActiveHoldLine = (ctx: DecisionContext, state: EngineState): boolean =
     ctx.aircraft.groundSpeed < STOPPED_KNOTS &&
     holdingShortRunway(ctx.airport.taxi, ctx.aircraft) === state.runway);
 
+const RUNWAY_CLEARANCES = ["line_up_and_wait", "takeoff", "land", "touch_and_go"] as const;
+
+// An aircraft that is lined up on the runway with nothing cleared, and calls
+// the tower without asking for anything, gets what a tower with no traffic
+// would give it: the takeoff clearance. (The alternative is silence, with an
+// aircraft sitting on the runway.) A pilot who explicitly asks for something,
+// reports a pattern leg or declares an emergency is handled as usual.
+const decideLinedUpCall = (
+  ctx: DecisionContext,
+  state: EngineState,
+  message: PilotMessage,
+): Decision | undefined => {
+  const withTower = !hasSeparatePositions(ctx.airport) || state.position === "tower";
+
+  if (
+    ctx.situation.phase !== FlightPhase.LinedUp ||
+    !withTower ||
+    !["readback", "position_report", "other"].includes(message.type) ||
+    asReportPoint(message.subject) ||
+    message.subject === "airborne" ||
+    findActive(state, [...RUNWAY_CLEARANCES])
+  ) {
+    return undefined;
+  }
+
+  return clear(state, "takeoff", ctx.situation.observedAtMs);
+};
+
 // "Holding short runway 23" is a report of where the aircraft is, so the
 // telemetry decides what it means. At the active runway's hold line it says
 // the pilot is ready: to ground it is the end of the taxi (hand over to tower),
@@ -437,6 +471,12 @@ export const decidePilotMessage = (
   }
 
   state = intake.state;
+
+  const linedUpCall = decideLinedUpCall(ctx, state, message);
+
+  if (linedUpCall) {
+    return linedUpCall;
+  }
 
   const holdShortReport = decideHoldShortReport(ctx, state, message);
 

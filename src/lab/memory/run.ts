@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEngineState } from "../../engine/engineState";
 import { decide } from "../../engine/decide";
+import { attachRemark } from "../../engine/remarks";
 import { ControllerStyle } from "../../domain/ControllerStyle";
 import { FlightEvent } from "../../domain/FlightEvent";
 import { FlightPhase } from "../../domain/FlightPhase";
@@ -259,6 +260,26 @@ function runEngineScenarios(): void {
   }
 }
 
+function runSafetyRemarks(): void {
+  const ctx = {
+    aircraft: aircraftIn(P.Taxiing),
+    airport: labAirportSingleController,
+    situation: situationIn(P.Taxiing, 400000),
+    style: { strictness: "normal" as const },
+    memory: { history: relationship(7), epochMs: NOW },
+  };
+  const state = createEngineState("23");
+
+  const stopping = attachRemark(ctx, state, [{ type: "instruct", instruction: "hold_position" }], []);
+  check("A remark never rides on 'hold position'", stopping.intents.length === 1);
+
+  const goAround = attachRemark(ctx, state, [{ type: "instruct", instruction: "go_around", runway: "23" }], []);
+  check("Nor on a go-around", goAround.intents.length === 1);
+
+  const routine = attachRemark(ctx, state, [{ type: "instruct", instruction: "report", expectReport: "base" }], []);
+  check("It still can on a routine instruction", routine.intents.length === 2);
+}
+
 async function runRecordKeeping(): Promise<void> {
   let record = createPilotRecord("pilot-1", "Andres");
   record = startVisit(record, FACILITY, NOW);
@@ -322,6 +343,7 @@ async function runRecordKeeping(): Promise<void> {
 async function runMemoryLab(): Promise<void> {
   runFamiliarity();
   runEngineScenarios();
+  runSafetyRemarks();
   await runRecordKeeping();
 
   console.log(

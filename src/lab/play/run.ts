@@ -33,7 +33,8 @@ Radio: just type what you would say, e.g.  Ground, LV-INQ, request taxi for depa
 Commands (start with /):
   /next            start the next stage of the standard flight (real time, about
                    the duration it says: the aircraft is not there until it arrives)
-  /go              run the next stage to the end, every second through the pipeline
+  /go              run the stage under way to its end, or, if none is, the next
+                   stage, every second through the pipeline
   /stages          list the stages and where you are
   /jump <stage>    put the aircraft at the start of a stage (name or number)
   /advance <s>     fast-forward s simulated seconds, one tick per second
@@ -166,6 +167,26 @@ async function main(): Promise<void> {
     switch (name) {
       case "next":
       case "go": {
+        // A stage still under way is finished first: queuing the next one behind
+        // it would have the aircraft carry on, unasked, into the next phase.
+        if (simulator.busy) {
+          if (name === "next") {
+            show(`Stage ${nextStage} is still under way. /go runs it to the end, /advance <s> moves time on.`);
+            return;
+          }
+
+          fastForwarding = true;
+
+          while (simulator.busy) {
+            advance(1);
+            await session.idle();
+          }
+
+          fastForwarding = false;
+          show(`Stage ${nextStage} complete: ${standardFlight[nextStage - 1].name}.`);
+          return;
+        }
+
         const stage = standardFlight[nextStage];
 
         if (!stage) {

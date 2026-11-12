@@ -12,12 +12,26 @@ You also receive the controller's LAST ATC TRANSMISSION. If it asked for the des
 
 Judge only what the pilot said. Never guess a destination.`;
 
-export const FLIGHT_INTAKE_SCHEMA = {
+export const OPTIONS_PROMPT = `
+
+The controller has just offered the airports listed under OPTIONS to choose between. Add one more field:
+
+- choice: the number of the option the pilot picked, even if they only say part of its name or a nearby town; "none" if the pilot did not pick one. When the pilot picks an option, put its name in destination too. If the pilot instead names a different airport that is not one of the options, put that airport in destination and use "none" for choice.`;
+
+export const buildFlightIntakeSchema = (optionCount: number) => ({
   type: "object",
   properties: {
     destination: { type: "string" },
     rules: { type: "string", enum: ["vfr", "ifr", NOT_STATED] },
     scope: { type: "string", enum: ["local", "away", NOT_STATED] },
+    ...(optionCount > 0
+      ? {
+          choice: {
+            type: "string",
+            enum: [...Array.from({ length: optionCount }, (_, i) => String(i + 1)), NOT_STATED],
+          },
+        }
+      : {}),
   },
-  required: ["destination", "rules", "scope"],
-};
+  required: ["destination", "rules", "scope", ...(optionCount > 0 ? ["choice"] : [])],
+});

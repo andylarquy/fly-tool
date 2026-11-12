@@ -206,12 +206,13 @@ async function runIntakeExtraction(): Promise<void> {
   let destinationOk = 0;
   let rulesOk = 0;
   let localOk = 0;
+  let choiceOk = 0;
   let invalid = 0;
   const latencies: number[] = [];
 
   for (const sample of intakeSamples) {
     const start = performance.now();
-    const got = await extractFlightIntake(sample.transcript, "LV-INQ", sample.lastAtc);
+    const got = await extractFlightIntake(sample.transcript, "LV-INQ", sample.lastAtc, sample.options);
     latencies.push(performance.now() - start);
 
     if (!got) {
@@ -224,6 +225,9 @@ async function runIntakeExtraction(): Promise<void> {
     const initials = (text?: string) =>
       (text ?? "").split(/[^\p{L}]+/u).filter(Boolean).map((word) => word[0]).join("").toLowerCase();
     const sameDestination =
+      // When an offered option was picked, the choice is the answer and the name
+      // the model repeats alongside it is not compared.
+      sample.choice !== undefined ||
       squash(got.destinationText) === squash(sample.destination) ||
       (sample.destination !== undefined && squash(got.destinationText) === initials(sample.destination));
 
@@ -231,15 +235,17 @@ async function runIntakeExtraction(): Promise<void> {
       destination: sameDestination,
       rules: got.rules === sample.rules,
       local: got.local === (sample.local ?? false),
+      choice: got.choice === sample.choice,
     };
 
     destinationOk += correct.destination ? 1 : 0;
     rulesOk += correct.rules ? 1 : 0;
     localOk += correct.local ? 1 : 0;
+    choiceOk += correct.choice ? 1 : 0;
 
     if (Object.values(correct).some((ok) => !ok)) {
       console.log(`DIFF "${sample.transcript}"`);
-      console.log(`     expected: ${JSON.stringify({ destination: sample.destination, rules: sample.rules, local: sample.local ?? false })}`);
+      console.log(`     expected: ${JSON.stringify({ destination: sample.destination, rules: sample.rules, local: sample.local ?? false, choice: sample.choice })}`);
       console.log(`     got:      ${JSON.stringify(got)}`);
     }
   }
@@ -249,6 +255,7 @@ async function runIntakeExtraction(): Promise<void> {
   console.log(`destination: ${percent(destinationOk, total)}`);
   console.log(`rules: ${percent(rulesOk, total)}`);
   console.log(`local: ${percent(localOk, total)}`);
+  console.log(`choice among offered options: ${percent(choiceOk, total)}`);
   console.log(`Invalid output: ${invalid}`);
   console.log(`Median latency: ${(median(latencies) / 1000).toFixed(2)} s`);
 }

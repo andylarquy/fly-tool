@@ -1,5 +1,6 @@
 import { AirportEntry } from "../../domain/AirportEntry";
 import { AirportDirectory } from "../../directory/airportDirectory";
+import { spokenName } from "../../directory/spokenName";
 import {
   buildEntries,
   directoryFilesExist,
@@ -155,6 +156,37 @@ function runSharedNames(): void {
   check("Candidates carry their distance", fixture.shortlist("Ezeiza", { near: BUENOS_AIRES }).candidates[0].distanceNauticalMiles !== undefined);
 }
 
+function runSpokenNames(): void {
+  const named = (name: string, municipality: string, aliases: string[]): AirportEntry => ({
+    ...entry("X", name, "ZZ", 0, 0),
+    municipality,
+    aliases,
+  });
+
+  check("A short official name is spoken without 'airport'", spokenName(named("Ezeiza International Airport", "", [])) === "Ezeiza");
+  check("The part before a dash is the name", spokenName(named("Ezeiza International Airport - Ministro Pistarini", "", [])) === "Ezeiza");
+  check(
+    "A long name is spoken as its town when the data lists the town as a name for it",
+    spokenName(
+      named("Ingeniero Aeronáutico Ambrosio L.V. Taravella International Airport", "Cordoba", [
+        "Ingeniero Aeronáutico Ambrosio L.V. Taravella International Airport",
+        "Cordoba",
+        "Cordoba",
+      ]),
+    ) === "Cordoba",
+  );
+  check(
+    "A long name keeps its own words when its town is a different place (Carrasco is in Ciudad de la Costa)",
+    spokenName(
+      named("Carrasco General Cesáreo L. Berisso International Airport", "Ciudad de la Costa", [
+        "Carrasco General Cesáreo L. Berisso International Airport",
+        "Ciudad de la Costa",
+        "Montevideo",
+      ]),
+    ) === "Carrasco General Cesáreo L. Berisso",
+  );
+}
+
 function runLoader(): void {
   const entries = buildEntries(
     '"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code","gps_code","local_code","home_link","wikipedia_link","keywords"\n' +
@@ -223,6 +255,7 @@ function runRealData(): void {
 runCsv();
 runText();
 runShortlist();
+runSpokenNames();
 runSharedNames();
 runLoader();
 runRealData();

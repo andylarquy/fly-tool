@@ -34,6 +34,7 @@ export interface FlightIntake {
   destination?: FlightDestination;
   rules?: "VFR";
   unrecognized?: string;
+  options?: AirportRef[];
   asked: number;
   abandoned?: boolean;
 }

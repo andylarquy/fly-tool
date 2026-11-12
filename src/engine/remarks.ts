@@ -68,6 +68,12 @@ const historyRemark = (ctx: DecisionContext): RemarkKind | undefined => {
 const isHistoryKind = (kind: RemarkKind): boolean =>
   kind === "welcome_back" || kind === "you_again" || kind === "previous_firm_landing";
 
+// "Hold position. Nice to see you back" is no way to stop an aircraft.
+const SAFETY_INSTRUCTIONS = ["hold_position", "hold_short", "go_around"];
+
+const isSafetyInstruction = (intent: AtcIntent): boolean =>
+  intent.type === "instruct" && SAFETY_INSTRUCTIONS.includes(intent.instruction);
+
 export const attachRemark = (
   ctx: DecisionContext,
   state: EngineState,
@@ -83,6 +89,7 @@ export const attachRemark = (
     ctx.style.strictness === "strict" ||
     intents.length === 0 ||
     !intents.every((intent) => HOST_INTENTS.includes(intent.type)) ||
+    intents.some(isSafetyInstruction) ||
     (state.lastRemarkAtMs !== undefined &&
       now - state.lastRemarkAtMs < MIN_GAP_BETWEEN_REMARKS_MS)
   ) {

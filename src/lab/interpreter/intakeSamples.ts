@@ -1,6 +1,8 @@
 export interface IntakeSample {
   transcript: string;
   lastAtc?: string;
+  options?: string[];
+  choice?: number;
   destination?: string;
   rules?: "VFR" | "IFR";
   local?: boolean;
@@ -38,4 +40,12 @@ export const intakeSamples: IntakeSample[] = [
   { transcript: "Good morning, ground, LV-INQ." },
   { transcript: "Say again the taxi route, LV-INQ." },
   { transcript: "Request pattern entry runway 23, LV-INQ." },
+  { transcript: "Adami", lastAtc: "LV-INQ, confirm destination, Carrasco General Cesáreo L. Berisso or Ángel S. Adami.", options: ["Carrasco General Cesáreo L. Berisso", "Ángel S. Adami"], choice: 2 },
+  { transcript: "Carrasco, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Carrasco General Cesáreo L. Berisso or Ángel S. Adami.", options: ["Carrasco General Cesáreo L. Berisso", "Ángel S. Adami"], choice: 1 },
+  { transcript: "The first one, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], choice: 1 },
+  { transcript: "Sur, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], choice: 2 },
+  { transcript: "Rivera Sur, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], choice: 2 },
+  { transcript: "El segundo, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], choice: 2 },
+  { transcript: "Hillside, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], destination: "Hillside" },
+  { transcript: "VFR, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], rules: "VFR" },
 ];

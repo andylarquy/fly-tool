@@ -263,7 +263,11 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   gives no rules is ignored (the model over-reports it). Naming this airport,
   or "local flight / pattern work", makes the destination this airport.
   A name the directory cannot place is asked for once more; said the same way again it is taken as spoken (a real place missing from the data, or a speech-to-text habit), so the pilot is never stuck. Several airports with the name get "Confirm destination, A or B" (full names
-  when the short ones would sound the same). The pilot is asked at most three
+  when the short ones would sound the same). The options are remembered
+  (`FlightIntake.options`) and handed to the extractor, which picks one *by
+  number* (even from "Adami" or "the second one"); a bare name that is neither
+  option is extracted again without the options, because with them in front
+  of it the model reads it as no answer. The pilot is asked at most three
   times, then left alone (`abandoned`): the experience stays slack. Arrivals,
   emergencies, readbacks and questions are never held up.
   Position claims and check-ins: a pilot saying "holding short runway 23"
@@ -277,11 +281,19 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   After a handoff (`awaitingCheckIn`), the first call that asks nothing is
   answered ("Tower, hold short runway 23" / "Ground, go ahead"); a request
   just proceeds and clears the flag.
+  A pilot lined up on the runway with nothing cleared who calls tower without
+  asking for anything gets the takeoff clearance (silence with an aircraft on
+  the runway is worse); requests, questions, leg reports and emergencies are
+  handled as usual. For a pending *taxi* instruction the verifier is
+  authoritative: the classifier's subject and runway do not decide "wrong
+  clearance" (it once filed a correct taxi readback under "line up" and got a
+  false "Negative").
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per
   kind per session, one history remark per session (never while the pilot is
-  busy), and not the same kind the last session ended with. Touchdown
+  busy), and not the same kind the last session ended with, and never on a safety
+  instruction (hold position, hold short, go around). Touchdown
   remarks follow the landing quality. They need `DecisionContext.memory`;
   without it the engine never remarks.
   Readback checks always correct a wrong runway/clearance; a missing runway is
@@ -346,6 +358,10 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   caller leave out the airport the pilot is on. Aliases such as "Aeroparque"
   are only as good as the data's keywords; a local alias file is still to
   come.
+- `src/directory/spokenName.ts` — how an airport is said aloud: its name
+  without "airport"/"international"; for a long official name its town only if
+  the data also lists the town as a name for it (Córdoba), otherwise the full
+  name (Carrasco is in Ciudad de la Costa, which nobody calls it).
 - `src/utils/csv.ts` — RFC 4180 parser (quoted commas, doubled quotes, line
   breaks); an empty number field must not become 0.
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.

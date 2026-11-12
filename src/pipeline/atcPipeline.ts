@@ -222,11 +222,19 @@ export const runPipelineTurn = async (
 
     if (message && message.type !== "emergency" && needsIntake(previous.engine)) {
       const intakeStart = performance.now();
-      const words = await extractFlightIntake(
+      const offered = previous.engine.intake?.options ?? [];
+      let words = await extractFlightIntake(
         pilotTransmission,
         callsign,
         previous.lastAtcTransmission,
+        offered.map((option) => option.name),
       );
+
+      // With the options in front of it the model takes a bare name that is
+      // neither of them for no answer at all. Without them it is a destination.
+      if (offered.length > 0 && words && words.choice === undefined && !words.destinationText) {
+        words = await extractFlightIntake(pilotTransmission, callsign, previous.lastAtcTransmission);
+      }
 
       timings.intakeMs = performance.now() - intakeStart;
 
@@ -236,9 +244,11 @@ export const runPipelineTurn = async (
           intake: {
             ...(words.rules ? { rules: words.rules } : {}),
             local: words.local,
-            ...(words.destinationText
-              ? { destination: resolveDestination(words.destinationText, aircraft, input.directory) }
-              : {}),
+            ...(words.choice !== undefined && offered[words.choice - 1]
+              ? { destination: { kind: "resolved" as const, airport: offered[words.choice - 1] } }
+              : words.destinationText
+                ? { destination: resolveDestination(words.destinationText, aircraft, input.directory) }
+                : {}),
           },
         };
       }

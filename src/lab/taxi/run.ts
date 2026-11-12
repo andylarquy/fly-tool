@@ -352,6 +352,14 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    name: "A correct taxi readback the classifier filed under 'line up' is not called the wrong clearance",
+    steps: [requestFromRamp, readback(COMPLETE, [], "23", "line_up")],
+  },
+  {
+    name: "Nor when the classifier filed it under another runway: the verifier, not the guess, checks the runway",
+    steps: [requestFromRamp, readback(COMPLETE, [], "other", "hold_short")],
+  },
+  {
     name: "Strict: a wrong runway in the readback is corrected with the route",
     strictness: "strict",
     steps: [requestFromRamp, readback(judged({ runwayMismatch: true }), [REPEAT_ROUTE])],
@@ -456,7 +464,7 @@ const scenarios: Scenario[] = [
     strictness: "relaxed",
     steps: [
       requestFromRamp,
-      readback(COMPLETE, [REPEAT_ROUTE], "05"),
+      readback(judged({ runwayMismatch: true }), [REPEAT_ROUTE], "05"),
     ],
   },
   {

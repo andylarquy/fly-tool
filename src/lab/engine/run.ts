@@ -149,6 +149,25 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
+    name: "Lined up with nothing cleared, a call that asks nothing gets the takeoff clearance",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("other", null, "other"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 4000, phase: P.LinedUp, pilot: msg("other", null, "other"), expect: [] },
+    ],
+  },
+  {
+    name: "Lined up with nothing cleared, a claim of holding short gets the takeoff clearance too",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("readback", "23", "hold_short"), expect: ["issue_clearance:takeoff"] },
+    ],
+  },
+  {
+    name: "Lined up, a question is answered as a question",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("question", null, "heading"), expect: ["advise:heading"] },
+    ],
+  },
+  {
     name: "Holding short at the active runway's line, said to a single controller, is a call for the departure clearance",
     steps: [
       { atMs: 0, phase: P.HoldingShort, holdingShortRunway: "23", pilot: msg("position_report", "23", "hold_short"), expect: [LINE_UP] },
