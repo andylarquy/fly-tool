@@ -1,5 +1,7 @@
 import { ReportPoint } from "./AtcIntent";
 import { EmergencyState } from "./Emergency";
+import { FlightIntake } from "./FlightIntake";
+import { PilotMessage } from "./PilotMessage";
 import { ControllerPosition } from "./Frequency";
 import { TaxiState } from "./Taxi";
 import { RemarkKind } from "./Remark";
@@ -17,4 +19,6 @@ export interface EngineState {
   lastRemarkAtMs?: number;
   airspaceEnteredAtMs?: number;
   emergency?: EmergencyState;
+  intake?: FlightIntake;
+  deferred?: PilotMessage;
 }

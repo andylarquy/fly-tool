@@ -24,6 +24,7 @@ import {
   reportAfter,
 } from "./pattern";
 import { Decision, DecisionContext } from "./decisionTypes";
+import { applyIntake } from "./decideIntake";
 import { handOffTo, hasSeparatePositions, positionForRequest } from "./positions";
 
 const MAX_READBACK_REJECTIONS = 2;
@@ -324,7 +325,7 @@ export const decidePilotMessage = (
   previous: EngineState,
   heard: PilotMessage,
 ): Decision => {
-  const state = { ...previous, contacted: true };
+  let state = { ...previous, contacted: true };
   const message: PilotMessage = isTaxiReadback(state, heard)
     ? { ...heard, type: "readback" }
     : heard;
@@ -352,6 +353,16 @@ export const decidePilotMessage = (
   if (belongsTo && belongsTo !== state.position) {
     return handOffTo(ctx, state, belongsTo);
   }
+
+  const intake = applyIntake(ctx, state, message, (next, deferred) =>
+    decidePilotMessage(ctx, next, deferred),
+  );
+
+  if (intake.decision) {
+    return intake.decision;
+  }
+
+  state = intake.state;
 
   switch (message.type) {
     case "request":

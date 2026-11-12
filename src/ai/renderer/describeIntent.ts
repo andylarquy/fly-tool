@@ -37,6 +37,12 @@ const taxiSentence = (
   return `${cross}Taxi to ${where}${via}${hold}.`;
 };
 
+const INTAKE_QUESTION = {
+  destination: "Say destination.",
+  rules: "Say flight rules.",
+  both: "Say destination and flight rules.",
+} as const;
+
 const URGENCY_WORDS: Record<EmergencyUrgency, string> = {
   mayday: "MAYDAY",
   pan_pan: "PAN-PAN",
@@ -122,7 +128,20 @@ export const describeIntent = (intent: AtcIntent): string => {
     case "acknowledge":
       return fields([["intent", `acknowledge_${intent.kind}`]]);
     case "unable":
-      return fields([["intent", "unable"]]);
+      return fields([
+        ["intent", "unable"],
+        ["text", intent.reason === "ifr_not_available" ? "IFR is not available." : undefined],
+      ]);
+    case "intake_question":
+      return fields([
+        ["intent", "intake_question"],
+        ["text", INTAKE_QUESTION[intent.ask]],
+      ]);
+    case "intake_clarify":
+      return fields([
+        ["intent", "intake_clarify"],
+        ["text", `Confirm destination, ${intent.options.join(" or ")}.`],
+      ]);
     case "emergency_response":
       return fields([
         ["intent", "emergency_response"],

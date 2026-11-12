@@ -1,9 +1,14 @@
+import { extractFlightIntake } from "../ai/interpreter/flightIntakeExtractor";
+import { AirportDirectory } from "../directory/airportDirectory";
+import { toAirportRef } from "../directory/spokenName";
+import { DestinationJudgement } from "../domain/FlightIntake";
+import { needsIntake } from "../engine/decideIntake";
 import { verifyTaxiReadback } from "../ai/interpreter/taxiReadbackVerifier";
 import { findPendingReadback } from "../engine/clearances";
 import { extractEmergencyDetails } from "../ai/interpreter/emergencyDetailsExtractor";
 import { classifyPilotMessage } from "../ai/interpreter/pilotMessageClassifier";
 import { renderTransmission } from "../ai/renderer/intentRenderer";
-import { createEngineState } from "../engine/engineState";
+import { createEngineState, EngineStateOptions } from "../engine/engineState";
 import { decide } from "../engine/decide";
 import { PilotInput } from "../engine/decisionTypes";
 import { AircraftState } from "../domain/AircraftState";
@@ -39,10 +44,12 @@ export interface PipelineInput {
   style?: ControllerStyle;
   callsign?: string;
   pilotTransmission?: string;
+  directory?: () => AirportDirectory | undefined;
 }
 
 export interface StageTimings {
   classifyMs: number;
+  intakeMs: number;
   extractMs: number;
   verifyMs: number;
   renderMs: number;
@@ -72,11 +79,77 @@ const repeatsOnly = (intents: AtcIntent[]): boolean =>
       (intent.query === "say_again" || intent.query === "full_readback"),
   );
 
+const initialsOf = (spoken: string): string => {
+  const words = spoken.split(/[^\p{L}]+/u).filter(Boolean);
+
+  return words.length >= 3 && words.length <= 4
+    ? words.map((word) => word[0]).join("")
+    : "";
+};
+
+export const resolveDestination = (
+  spoken: string,
+  aircraft: { latitude: number; longitude: number },
+  directory: PipelineInput["directory"],
+): DestinationJudgement => {
+  const airports = directory?.();
+
+  if (!airports) {
+    return { kind: "unresolvable", text: spoken };
+  }
+
+  let { candidates, confident } = airports.shortlist(spoken, { near: aircraft, limit: 3 });
+
+  // Cue words in front of or behind the name ("destino Harbor Field") match
+  // nothing, so try again without them.
+  const words = spoken.split(/\s+/).filter(Boolean);
+
+  for (let drop = 1; candidates.length === 0 && drop <= 2 && words.length - drop >= 1; drop++) {
+    for (const trimmed of [words.slice(drop), words.slice(0, -drop)]) {
+      const retry = airports.shortlist(trimmed.join(" "), { near: aircraft, limit: 3 });
+
+      if (retry.candidates.length > 0) {
+        ({ candidates, confident } = retry);
+        break;
+      }
+    }
+  }
+
+  if (confident) {
+    return { kind: "resolved", airport: toAirportRef(candidates[0].airport) };
+  }
+
+  // A code spelled out as words ("Sierra Alpha Bravo Echo"): only tried when
+  // the words did not already name an airport, so a real name is never
+  // mistaken for a code.
+  const spelled = airports.byCode(initialsOf(spoken));
+
+  if (spelled) {
+    return { kind: "resolved", airport: toAirportRef(spelled) };
+  }
+
+  if (candidates.length < 2) {
+    return { kind: "unknown", text: spoken };
+  }
+
+  const options = candidates.slice(0, 2).map((c) => toAirportRef(c.airport));
+
+  // Two airports that would sound the same are told apart by their full names.
+  return {
+    kind: "ambiguous",
+    options:
+      options[0].name === options[1].name
+        ? candidates.slice(0, 2).map((c) => ({ ...toAirportRef(c.airport), name: c.airport.name }))
+        : options,
+  };
+};
+
 export const createPipelineState = (
   runway: string,
   record: PilotRecord,
+  options: EngineStateOptions = {},
 ): PipelineState => ({
-  engine: createEngineState(runway),
+  engine: createEngineState(runway, options),
   record,
   visitStarted: false,
 });
@@ -113,7 +186,13 @@ export const runPipelineTurn = async (
 
   let pilot: PilotInput = { status: "none" };
   let message: PilotMessage | undefined;
-  const timings: StageTimings = { classifyMs: 0, extractMs: 0, verifyMs: 0, renderMs: 0 };
+  const timings: StageTimings = {
+    classifyMs: 0,
+    intakeMs: 0,
+    extractMs: 0,
+    verifyMs: 0,
+    renderMs: 0,
+  };
 
   if (pilotTransmission) {
     const classifyStart = performance.now();
@@ -131,6 +210,30 @@ export const runPipelineTurn = async (
       const emergency = await extractEmergencyDetails(pilotTransmission);
       timings.extractMs = performance.now() - extractStart;
       message = { ...message, emergency };
+    }
+
+    if (message && message.type !== "emergency" && needsIntake(previous.engine)) {
+      const intakeStart = performance.now();
+      const words = await extractFlightIntake(
+        pilotTransmission,
+        callsign,
+        previous.lastAtcTransmission,
+      );
+
+      timings.intakeMs = performance.now() - intakeStart;
+
+      if (words) {
+        message = {
+          ...message,
+          intake: {
+            ...(words.rules ? { rules: words.rules } : {}),
+            local: words.local,
+            ...(words.destinationText
+              ? { destination: resolveDestination(words.destinationText, aircraft, input.directory) }
+              : {}),
+          },
+        };
+      }
     }
 
     const taxi = previous.engine.taxi;

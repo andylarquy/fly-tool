@@ -1,9 +1,11 @@
 import { extractEmergencyDetails } from "../../ai/interpreter/emergencyDetailsExtractor";
+import { extractFlightIntake } from "../../ai/interpreter/flightIntakeExtractor";
 import { verifyTaxiReadback } from "../../ai/interpreter/taxiReadbackVerifier";
 import { classifyPilotMessage } from "../../ai/interpreter/pilotMessageClassifier";
 import { PilotMessage } from "../../domain/PilotMessage";
 import { MODEL } from "../../ai/modelConfig";
 import { labAirport } from "../airports";
+import { intakeSamples } from "./intakeSamples";
 import { readbackSamples } from "./readbackSamples";
 import { samples } from "./samples";
 
@@ -195,12 +197,74 @@ async function runReadbackVerification(): Promise<void> {
   console.log(`Median latency: ${(median(latencies) / 1000).toFixed(2)} s`);
 }
 
+async function runIntakeExtraction(): Promise<void> {
+  console.log("\n=== Flight intake extractor ===");
+
+  const squash = (text?: string) => (text ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  let destinationOk = 0;
+  let rulesOk = 0;
+  let localOk = 0;
+  let invalid = 0;
+  const latencies: number[] = [];
+
+  for (const sample of intakeSamples) {
+    const start = performance.now();
+    const got = await extractFlightIntake(sample.transcript, "LV-INQ", sample.lastAtc);
+    latencies.push(performance.now() - start);
+
+    if (!got) {
+      invalid++;
+      console.log(`INVALID "${sample.transcript}"`);
+      continue;
+    }
+
+    // "SAEZ" and "Sierra Alpha Echo Zulu" are the same destination.
+    const initials = (text?: string) =>
+      (text ?? "").split(/[^\p{L}]+/u).filter(Boolean).map((word) => word[0]).join("").toLowerCase();
+    const sameDestination =
+      squash(got.destinationText) === squash(sample.destination) ||
+      (sample.destination !== undefined && squash(got.destinationText) === initials(sample.destination));
+
+    const correct = {
+      destination: sameDestination,
+      rules: got.rules === sample.rules,
+      local: got.local === (sample.local ?? false),
+    };
+
+    destinationOk += correct.destination ? 1 : 0;
+    rulesOk += correct.rules ? 1 : 0;
+    localOk += correct.local ? 1 : 0;
+
+    if (Object.values(correct).some((ok) => !ok)) {
+      console.log(`DIFF "${sample.transcript}"`);
+      console.log(`     expected: ${JSON.stringify({ destination: sample.destination, rules: sample.rules, local: sample.local ?? false })}`);
+      console.log(`     got:      ${JSON.stringify(got)}`);
+    }
+  }
+
+  const total = intakeSamples.length;
+  console.log("");
+  console.log(`destination: ${percent(destinationOk, total)}`);
+  console.log(`rules: ${percent(rulesOk, total)}`);
+  console.log(`local: ${percent(localOk, total)}`);
+  console.log(`Invalid output: ${invalid}`);
+  console.log(`Median latency: ${(median(latencies) / 1000).toFixed(2)} s`);
+}
+
 async function main(): Promise<void> {
-  if (!process.argv.includes("--verifier")) {
+  const only = ["--verifier", "--intake"].find((flag) => process.argv.includes(flag));
+
+  if (!only) {
     await runClassification();
   }
 
-  await runReadbackVerification();
+  if (!only || only === "--verifier") {
+    await runReadbackVerification();
+  }
+
+  if (!only || only === "--intake") {
+    await runIntakeExtraction();
+  }
 }
 
 main().catch((error: unknown) => {

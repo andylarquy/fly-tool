@@ -428,6 +428,43 @@ export const renderCases: RenderCase[] = [
     },
   },
   {
+    name: "Ask for destination and flight rules",
+    intents: [{ type: "intake_question", ask: "both" }],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["say destination and flight rules"],
+      forbiddenPatterns: ["cleared", "taxi"],
+    },
+  },
+  {
+    name: "Ask only for the flight rules",
+    intents: [{ type: "intake_question", ask: "rules" }],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["say flight rules"],
+      forbiddenPatterns: ["destination"],
+    },
+  },
+  {
+    name: "IFR refusal followed by the question",
+    intents: [
+      { type: "unable", reason: "ifr_not_available" },
+      { type: "intake_question", ask: "rules" },
+    ],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["ifr is not available", "say flight rules"],
+    },
+  },
+  {
+    name: "Confirm between two airports",
+    intents: [{ type: "intake_clarify", options: ["Rivera Norte", "Rivera Sur"] }],
+    expectations: {
+      responseRequired: true,
+      requiredConcepts: ["confirm destination", "rivera norte", "rivera sur"],
+    },
+  },
+  {
     name: "Hold short instruction",
     intents: [{ type: "instruct", instruction: "hold_short", runway: "23" }],
     expectations: {

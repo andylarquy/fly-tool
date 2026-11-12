@@ -28,6 +28,7 @@ export const PILOT_MESSAGE_SUBJECTS = [
 ] as const;
 
 import { EmergencyDetails } from "./Emergency";
+import { IntakeJudgement } from "./FlightIntake";
 
 export type PilotMessageType = (typeof PILOT_MESSAGE_TYPES)[number];
 export type PilotMessageSubject = (typeof PILOT_MESSAGE_SUBJECTS)[number];
@@ -48,4 +49,5 @@ export interface PilotMessage {
   subject: PilotMessageSubject;
   emergency?: EmergencyDetails;
   taxiReadback?: TaxiReadbackJudgement;
+  intake?: IntakeJudgement;
 }

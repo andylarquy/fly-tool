@@ -44,6 +44,10 @@ export const label = (intent: AtcIntent): string => {
 
       return `taxi_instruction:${intent.reason}:${where}:${legs || "-"}${hold}${cross}`;
     }
+    case "intake_question":
+      return `intake_question:${intent.ask}`;
+    case "intake_clarify":
+      return `intake_clarify:${intent.options.join("|")}`;
     case "handoff":
       return `handoff:${intent.to}:${intent.frequencyMhz}`;
     case "acknowledge":

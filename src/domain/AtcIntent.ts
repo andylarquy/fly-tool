@@ -55,4 +55,9 @@ export type AtcIntent =
       nature?: EmergencyNature;
       ask: EmergencyQuestion[];
     }
-  | { type: "unable"; reason: "no_information" | "not_supported" | "no_route" };
+  | {
+      type: "unable";
+      reason: "no_information" | "not_supported" | "no_route" | "ifr_not_available";
+    }
+  | { type: "intake_question"; ask: "destination" | "rules" | "both" }
+  | { type: "intake_clarify"; options: string[] };
