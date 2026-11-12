@@ -6,6 +6,7 @@ import { normalize, significantTokens, tokenSimilarity } from "./textMatch";
 export interface AirportCandidate {
   airport: AirportEntry;
   score: number;
+  nameScore: number;
   matchedOn: string;
   distanceNauticalMiles?: number;
 }
@@ -22,26 +23,34 @@ export interface Shortlist {
   confident: boolean;
 }
 
+// Size decides between airports that share a town: "Bariloche" means the
+// international airport, not the aeroclub strip that also carries the name.
 const TYPE_WEIGHT: Record<AirportEntryType, number> = {
   large: 1,
-  medium: 0.95,
-  small: 0.85,
-  seaplane: 0.5,
-  heliport: 0.4,
-  other: 0.7,
+  medium: 0.85,
+  small: 0.6,
+  seaplane: 0.4,
+  heliport: 0.3,
+  other: 0.6,
 };
 
 const PROXIMITY_SCALE_NM = 150;
-const PROXIMITY_BONUS = 0.3;
-const CONFIDENT_SCORE = 0.8;
-const CONFIDENT_MARGIN = 0.15;
+// An airport far away keeps at least this share of its score, so distance can
+// settle a tie between same-named airports but never erases a good match.
+const PROXIMITY_FLOOR = 0.5;
+// How well the words matched, before size and distance are weighed in: a small
+// airstrip that is the only one with its name is still a confident match.
+const CONFIDENT_NAME_SCORE = 0.75;
+// The runner-up has to score at most this share of the best: a relative test,
+// because distance scales every score down and shrinks absolute gaps.
+const CONFIDENT_RATIO = 0.8;
 const MINIMUM_SCORE = 0.5;
 const DEFAULT_LIMIT = 5;
 
 // A same-named airport this much farther away than the best match, and by at
 // least this many miles, is not a serious rival: nobody means Santa Fe, New
 // Mexico from Buenos Aires.
-const FAR_RIVAL_RATIO = 3;
+const FAR_RIVAL_RATIO = 2;
 const FAR_RIVAL_EXTRA_NM = 100;
 
 interface IndexedAirport {
@@ -152,7 +161,11 @@ export class AirportDirectory {
 
       candidates.push({
         airport: entry.airport,
-        score: score * TYPE_WEIGHT[entry.airport.type] * (1 + PROXIMITY_BONUS * proximity),
+        score:
+          score *
+          TYPE_WEIGHT[entry.airport.type] *
+          (options.near ? PROXIMITY_FLOOR + (1 - PROXIMITY_FLOOR) * proximity : 1),
+        nameScore: score,
         matchedOn,
         ...(distance === undefined ? {} : { distanceNauticalMiles: distance }),
       });
@@ -164,10 +177,10 @@ export class AirportDirectory {
     const [first, ...rivals] = top;
     const confident =
       first !== undefined &&
-      first.score >= CONFIDENT_SCORE &&
+      first.nameScore >= CONFIDENT_NAME_SCORE &&
       rivals
         .filter((rival) => !isFarRival(first, rival))
-        .every((rival) => first.score - rival.score >= CONFIDENT_MARGIN);
+        .every((rival) => rival.score <= first.score * CONFIDENT_RATIO);
 
     return { candidates: top, confident };
   }

@@ -105,7 +105,8 @@ doesn't have real situational grounding yet.
   end: type radio calls as the pilot and step a *simulated* aircraft through
   the standard pattern flight, with the real pipeline (classifier, engine,
   renderer) answering and speaking up on its own. Needs Ollama. Commands start
-  with `/` (`/next` fly the next stage, `/advance <s>` fast-forward one tick
+  with `/` (`/next` start the next stage in real time and say how long it
+  takes, `/go` run it to the end, `/advance <s>` fast-forward one tick
   per second, `/jump`, `/speed`, `/tune`, `/where`, `/stages`, `/quit`);
   flags: `--intake` (ask for destination and rules), `--speed <n>`,
   `--lab-airports` (force the small fictional list; the default is the real OurAirports data whenever the CSVs are on disk), `--callsign <x>` (a mistyped option is reported, not ignored), `--records <dir>`
@@ -265,6 +266,17 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   when the short ones would sound the same). The pilot is asked at most three
   times, then left alone (`abandoned`): the experience stays slack. Arrivals,
   emergencies, readbacks and questions are never held up.
+  Position claims and check-ins: a pilot saying "holding short runway 23"
+  (not a request, nothing pending a readback) is making a report, so the
+  telemetry decides what it means. "At the active runway's hold line" is
+  judged from the aircraft's live position and speed (not the committed phase,
+  which needs a few seconds of standing still and would call a pilot who has
+  just stopped "still taxiing"). At the line it is a call for the departure
+  clearance (to a ground controller it first hands over to tower); elsewhere
+  on the ground it is queried ("Confirm holding short, I show you taxiing").
+  After a handoff (`awaitingCheckIn`), the first call that asks nothing is
+  answered ("Tower, hold short runway 23" / "Ground, go ahead"); a request
+  just proceeds and clears the flag.
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per
@@ -317,14 +329,18 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   name + municipality + keywords, position, type, joined frequencies); closed
   airports and rows with no position are dropped. `airportDirectory.ts`
   `shortlist(spoken, {near})` returns ranked candidates and whether the best is
-  `confident` (clear lead over the second): exact codes, then word matching
+  `confident` (the best name match is good, and the runner-up scores at most
+  80% of it: a relative test, since distance scales every score down): exact
+  codes, then word matching
   that ignores accents, case and generic words ("airport", "aeropuerto de"),
   tolerates a typo in long words, needs every query word to match something,
-  and weighs airport size and distance from `near` (so "Moron" near Buenos
+  and weighs airport size (strongly: "Bariloche" is the international airport,
+  not the aeroclub strip that carries the town's name as a keyword) and
+  distance from `near` (a multiplier that can halve a far airport's score) (so "Moron" near Buenos
   Aires is the Argentine one). An ambiguous result is meant to make the
   controller confirm, not guess. Index build is ~0.2 s and shortlist ~50-90 ms
   over the full set. Distance is a strong signal: a same-named airport at least
-  3x and 100 nm farther than the best match is not counted as a rival (nobody
+  2x and 100 nm farther than the best match is not counted as a rival (nobody
   means Santa Fe, New Mexico from Buenos Aires), but at similar distances the
   bigger airport wins and a close call stays ambiguous. `exclude` lets the
   caller leave out the airport the pilot is on. Aliases such as "Aeroparque"

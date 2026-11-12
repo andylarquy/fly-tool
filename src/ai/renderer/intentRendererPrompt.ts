@@ -34,7 +34,8 @@ PHRASEBOOK (intent -> standard form, written without the callsign; always put th
 - advise_airborne: value=true: "You are airborne." value=false: "You are on the ground."
 - query_say_again: "Say again."
 - query_say_intentions: "Say intentions."
-- query_confirm_position: "Confirm <pilot_said>, I show you <we_observe>."
+- query_confirm_position: if text is given write it exactly, otherwise "Confirm <pilot_said>, I show you <we_observe>."
+- check_in_reply: write the text exactly as given.
 - query_full_readback: "Say again, full readback."
 - acknowledge_readback_correct: "Readback correct."
 - acknowledge_courtesy: a very short courteous reply such as "Roger."

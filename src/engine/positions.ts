@@ -74,7 +74,7 @@ export const handOffTo = (
 ): Decision =>
   say(
     { type: "handoff", to, frequencyMhz: frequencyFor(ctx.airport, to)! },
-    { ...state, position: to, awaitingGroundHandoff: undefined },
+    { ...state, position: to, awaitingGroundHandoff: undefined, awaitingCheckIn: to },
   );
 
 const GROUND_SUBJECTS: PilotMessage["subject"][] = ["taxi", "parking"];

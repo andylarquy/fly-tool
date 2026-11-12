@@ -134,6 +134,22 @@ function runSharedNames(): void {
   ]).shortlist("Rosario", { near: BUENOS_AIRES });
   check("At equal size the nearer airport comes first", nearer.candidates[0].airport.id === "NEAR");
 
+  const town = new AirportDirectory([
+    entry("BIG", "Teniente Candelaria International Airport", "AR", -41.1, -71.2, {
+      type: "large",
+      aliases: ["Teniente Candelaria International Airport", "San Carlos de Bariloche"],
+    }),
+    entry("CLUB", "Lago Nahuel Huapi Airfield", "AR", -41.0, -71.5, {
+      type: "small",
+      aliases: ["Lago Nahuel Huapi Airfield", "San Carlos de Bariloche", "Aeroclub Bariloche"],
+    }),
+  ]).shortlist("Bariloche", { near: BUENOS_AIRES });
+  check(
+    "A town's big airport beats a small strip that carries the town's name in a keyword",
+    town.candidates[0].airport.id === "BIG" && town.confident,
+    JSON.stringify(town.candidates.map((c) => [c.airport.id, c.score])),
+  );
+
   const without = fixture.shortlist("El Palomar", { near: BUENOS_AIRES, exclude: ["SADP"] });
   check("An excluded airport (the one the pilot is on) is never offered", without.candidates.every((c) => c.airport.id !== "SADP"));
   check("Candidates carry their distance", fixture.shortlist("Ezeiza", { near: BUENOS_AIRES }).candidates[0].distanceNauticalMiles !== undefined);
@@ -183,6 +199,11 @@ function runRealData(): void {
   check("Real data: EZE and SAEZ", best("EZE").candidates[0]?.airport.id === "SAEZ" && best("SAEZ").candidates[0]?.airport.id === "SAEZ");
   check("Real data: a typo", best("Eseiza").candidates[0]?.airport.id === "SAEZ");
   check("Real data: Buenos Aires is ambiguous", !best("Buenos Aires").confident);
+  check(
+    "Real data: Bariloche is the international airport, confidently",
+    best("Bariloche").candidates[0]?.airport.id === "SAZS" && best("Bariloche").confident,
+    best("Bariloche").candidates.map((c) => c.airport.id).join(),
+  );
   check("Real data: Santa Fe from Buenos Aires puts the Argentine airport first", best("Santa Fe").candidates[0]?.airport.country === "AR");
   check(
     "Real data: Cordoba from Mendoza is the big airport, confidently",

@@ -74,6 +74,8 @@ const emergencyQuestions = (ask: EmergencyQuestion[]): string => {
   return sentences.join(" ") || "none";
 };
 
+const CLAIM_WORDS: Record<string, string> = { hold_short: "holding short" };
+
 const words = (value: string): string => value.replace(/_/g, " ");
 
 // Only speakable values go to the model; internal ones such as the touchdown
@@ -109,8 +111,26 @@ export const describeIntent = (intent: AtcIntent): string => {
     case "query":
       return fields([
         ["intent", `query_${intent.query}`],
-        ["pilot_said", intent.claimed],
+        ["pilot_said", intent.claimed && words(intent.claimed)],
         ["we_observe", intent.observed && words(intent.observed)],
+        [
+          "text",
+          intent.query === "confirm_position" && intent.claimed
+            ? `Confirm ${CLAIM_WORDS[intent.claimed] ?? words(intent.claimed)}${
+                intent.observed ? `, I show you ${words(intent.observed)}` : ""
+              }.`
+            : undefined,
+        ],
+      ]);
+    case "check_in_reply":
+      return fields([
+        ["intent", "check_in_reply"],
+        [
+          "text",
+          `${intent.position === "ground" ? "Ground" : "Tower"}, ${
+            intent.holdShort ? `hold short runway ${intent.holdShort}` : "go ahead"
+          }.`,
+        ],
       ]);
     case "taxi_instruction":
       return fields([

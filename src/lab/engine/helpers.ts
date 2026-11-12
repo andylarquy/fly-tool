@@ -48,6 +48,8 @@ export const label = (intent: AtcIntent): string => {
       return `intake_question:${intent.ask}`;
     case "intake_clarify":
       return `intake_clarify:${intent.options.join("|")}`;
+    case "check_in_reply":
+      return `check_in_reply:${intent.position}:${intent.holdShort ? `hold ${intent.holdShort}` : "-"}`;
     case "handoff":
       return `handoff:${intent.to}:${intent.frequencyMhz}`;
     case "acknowledge":
@@ -82,7 +84,11 @@ export const aircraftIn = (phase: FlightPhase): AircraftState => ({
   isOnGround: !isAirbornePhase(phase),
 });
 
-export const situationIn = (phase: FlightPhase, atMs: number): Situation => ({
+export const situationIn = (
+  phase: FlightPhase,
+  atMs: number,
+  holdingShortRunway?: string,
+): Situation => ({
   observedAtMs: atMs,
   runway: "23",
   phase,
@@ -96,5 +102,6 @@ export const situationIn = (phase: FlightPhase, atMs: number): Situation => ({
   onGround: !isAirbornePhase(phase),
   onRunway: phase === FlightPhase.LinedUp || phase === FlightPhase.LandingRoll,
   inAirspace: true,
+  ...(holdingShortRunway ? { holdingShortRunway } : {}),
   lastVerticalSpeedFeetPerMinute: 0,
 });

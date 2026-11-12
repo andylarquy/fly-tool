@@ -14,6 +14,7 @@ export interface EngineState {
   contacted: boolean;
   position?: ControllerPosition;
   awaitingGroundHandoff?: boolean;
+  awaitingCheckIn?: ControllerPosition;
   taxi?: TaxiState;
   remarksMade: RemarkKind[];
   lastRemarkAtMs?: number;

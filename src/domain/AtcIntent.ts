@@ -35,7 +35,7 @@ export type AtcIntent =
   | {
       type: "query";
       query: "say_again" | "say_intentions" | "confirm_position" | "full_readback";
-      claimed?: ReportPoint;
+      claimed?: ReportPoint | "hold_short";
       observed?: FlightPhase;
     }
   | {
@@ -47,6 +47,7 @@ export type AtcIntent =
       crossFirst?: string;
     }
   | { type: "handoff"; to: ControllerPosition; frequencyMhz: number }
+  | { type: "check_in_reply"; position: ControllerPosition; holdShort?: string }
   | { type: "remark"; remark: Remark }
   | { type: "acknowledge"; kind: "readback_correct" | "courtesy" }
   | {

@@ -12,6 +12,7 @@ type Heard = PilotMessage | "unintelligible";
 interface Step {
   atMs: number;
   phase: FlightPhase;
+  holdingShortRunway?: string;
   pilot?: Heard;
   events?: FlightEvent[];
   expect: string[];
@@ -24,6 +25,7 @@ interface EngineScenario {
 }
 
 const P = FlightPhase;
+const LINE_UP = "issue_clearance:line_up_and_wait";
 
 const scenarios: EngineScenario[] = [
   {
@@ -147,6 +149,37 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
+    name: "Holding short at the active runway's line, said to a single controller, is a call for the departure clearance",
+    steps: [
+      { atMs: 0, phase: P.HoldingShort, holdingShortRunway: "23", pilot: msg("position_report", "23", "hold_short"), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "Holding short claimed while still taxiing is queried, not ignored",
+    steps: [
+      { atMs: 0, phase: P.Taxiing, pilot: msg("readback", "23", "hold_short"), expect: ["query:confirm_position"] },
+    ],
+  },
+  {
+    name: "Holding short claimed on the ramp is queried too",
+    steps: [
+      { atMs: 0, phase: P.Stationary, pilot: msg("position_report", "23", "hold_short"), expect: ["query:confirm_position"] },
+    ],
+  },
+  {
+    name: "A readback of an instruction still waiting for it is not taken for a position claim",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 2000, phase: P.Taxiing, pilot: msg("readback", "23", "hold_short"), expect: [] },
+    ],
+  },
+  {
+    name: "A request is never second-guessed by the hold-short report rule",
+    steps: [
+      { atMs: 0, phase: P.Taxiing, pilot: msg("request", "23", "hold_short"), expect: [LINE_UP] },
+    ],
+  },
+  {
     name: "Pattern entry from outside",
     steps: [
       { atMs: 0, phase: P.Inbound, pilot: msg("request", "23", "pattern_entry"), expect: ["instruct:enter_pattern"] },
@@ -242,7 +275,7 @@ function runEngineReplay(): void {
         {
           aircraft: aircraftIn(step.phase),
           airport: labAirportSingleController,
-          situation: situationIn(step.phase, step.atMs),
+          situation: situationIn(step.phase, step.atMs, step.holdingShortRunway),
           style: { strictness: scenario.strictness ?? "normal" },
           events: step.events ?? [],
           pilot:

@@ -288,6 +288,7 @@ interface Scenario {
 
 const A = positions;
 
+const LINE_UP_LABEL = "issue_clearance:line_up_and_wait";
 const taxiToRunway23 = "taxi_instruction:request:runway 23:C+A+B:hold 23";
 const requestFromRamp: Step = {
   position: A.rampSpot,
@@ -606,6 +607,64 @@ const scenarios: Scenario[] = [
       { position: A.taxiingOnAlpha, expect: [] },
       { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
       { position: A.holdingShort, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
+    name: "The first call to tower after the handoff, asking nothing, is answered with the hold short",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("other", null, "other"), expect: ["check_in_reply:tower:hold 23"] },
+      { position: A.holdingShort, pilot: msg("other", null, "other"), expect: [] },
+    ],
+  },
+  {
+    name: "Reporting holding short to tower at the line is a call for the departure clearance",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("position_report", "23", "hold_short"), expect: [LINE_UP_LABEL] },
+    ],
+  },
+  {
+    name: "Reporting holding short the moment the aircraft stops at the line is believed, before the phase commits",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"], ticks: 1 },
+      { position: A.holdingShort, ticks: 0, pilot: msg("position_report", "23", "hold_short"), expect: [LINE_UP_LABEL] },
+    ],
+  },
+  {
+    name: "Holding short claimed to ground while still taxiing is queried (after the readback)",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      readback(COMPLETE, []),
+      { position: A.taxiingOnAlpha, pilot: msg("readback", "23", "hold_short"), expect: ["query:confirm_position"] },
+    ],
+  },
+  {
+    name: "A request right after the handoff is just answered, and clears the check-in",
+    airport: labAirport,
+    steps: [
+      requestFromRamp,
+      { position: A.holdingShort, expect: ["handoff:tower:118.1"] },
+      { position: A.holdingShort, pilot: msg("request", "23", "takeoff"), expect: [LINE_UP_LABEL] },
+      { position: A.holdingShort, pilot: msg("other", null, "other"), expect: [] },
+    ],
+  },
+  {
+    name: "After landing the first call to ground is answered",
+    airport: labAirport,
+    steps: [
+      { position: A.final, pilot: msg("position_report", null, "final"), expect: ["issue_clearance:land"] },
+      { position: A.smoothFlare, expect: [] },
+      { position: A.landingRoll, expect: ["instruct:vacate_runway"] },
+      { position: A.clearOfRunway, expect: ["handoff:ground:121.9"] },
+      { position: A.clearOfRunway, pilot: msg("other", null, "other"), expect: ["check_in_reply:ground:-"] },
     ],
   },
   {

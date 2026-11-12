@@ -31,7 +31,9 @@ const numberAfter = (name: string, fallback: number): number => {
 const HELP = `
 Radio: just type what you would say, e.g.  Ground, LV-INQ, request taxi for departure.
 Commands (start with /):
-  /next            fly or taxi the next stage of the standard pattern flight
+  /next            start the next stage of the standard flight (real time, about
+                   the duration it says: the aircraft is not there until it arrives)
+  /go              run the next stage to the end, every second through the pipeline
   /stages          list the stages and where you are
   /jump <stage>    put the aircraft at the start of a stage (name or number)
   /advance <s>     fast-forward s simulated seconds, one tick per second
@@ -162,7 +164,8 @@ async function main(): Promise<void> {
     const [name, argument] = line.slice(1).trim().split(/\s+/);
 
     switch (name) {
-      case "next": {
+      case "next":
+      case "go": {
         const stage = standardFlight[nextStage];
 
         if (!stage) {
@@ -170,9 +173,27 @@ async function main(): Promise<void> {
           return;
         }
 
+        const seconds = Math.round(stage.path.reduce((total, leg) => total + leg.seconds, 0));
+
         simulator.enqueue(stage.path);
         nextStage++;
-        show(`Stage ${nextStage}/${standardFlight.length}: ${stage.description}`);
+        show(
+          `Stage ${nextStage}/${standardFlight.length}: ${stage.description} ` +
+            `(about ${seconds} s${name === "next" ? `; at ${speed}x that is ${Math.round(seconds / speed)} s of waiting, or use /go` : ""})`,
+        );
+
+        if (name === "go") {
+          fastForwarding = true;
+
+          while (simulator.busy) {
+            advance(1);
+            await session.idle();
+          }
+
+          fastForwarding = false;
+          show(`Stage ${nextStage} complete: ${stage.name}.`);
+        }
+
         return;
       }
       case "stages":
@@ -222,7 +243,8 @@ async function main(): Promise<void> {
       case "where": {
         const { situation, engine } = session.state;
         show(
-          `phase ${situation?.phase ?? "unknown"}, ground speed ${Math.round(simulator.state.groundSpeed)} kt, ` +
+          `phase ${situation?.phase ?? "unknown"}${simulator.busy ? " (the aircraft is still moving along its stage)" : ""}, ` +
+            `ground speed ${Math.round(simulator.state.groundSpeed)} kt, ` +
             `controller: ${engine.position ?? "single"}, flight plan: ${engine.intake?.destination?.name ?? "none"}`,
         );
         return;

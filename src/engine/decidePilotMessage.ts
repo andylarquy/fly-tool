@@ -24,6 +24,7 @@ import {
   nextReportForPhase,
   reportAfter,
 } from "./pattern";
+import { holdingShortRunway } from "../taxi/routing";
 import { Decision, DecisionContext } from "./decisionTypes";
 import { applyIntake } from "./decideIntake";
 import { handOffTo, hasSeparatePositions, positionForRequest } from "./positions";
@@ -55,6 +56,10 @@ const requestDeparture = (
     findActive(state, ["line_up_and_wait"])
       ? silent(state)
       : clear(state, "line_up_and_wait", situation.observedAtMs);
+
+  if (situation.phase !== FlightPhase.LinedUp && isAtActiveHoldLine(ctx, state)) {
+    return lineUp();
+  }
 
   switch (situation.phase) {
     case FlightPhase.LinedUp:
@@ -322,6 +327,59 @@ const decideQuestion = (
   }
 };
 
+const STOPPED_KNOTS = 1.5;
+
+// The committed phase needs a few seconds of standing still, so a pilot who
+// stops at the line and reports at once would be told they are still taxiing.
+// The aircraft's own position and speed answer that immediately.
+const isAtActiveHoldLine = (ctx: DecisionContext, state: EngineState): boolean =>
+  (ctx.situation.phase === FlightPhase.HoldingShort &&
+    ctx.situation.holdingShortRunway === state.runway) ||
+  (ctx.airport.taxi !== undefined &&
+    ctx.aircraft.isOnGround &&
+    ctx.aircraft.groundSpeed < STOPPED_KNOTS &&
+    holdingShortRunway(ctx.airport.taxi, ctx.aircraft) === state.runway);
+
+// "Holding short runway 23" is a report of where the aircraft is, so the
+// telemetry decides what it means. At the active runway's hold line it says
+// the pilot is ready: to ground it is the end of the taxi (hand over to tower),
+// to tower it is a call for the departure clearance. Anywhere else on the
+// ground it is not true, and the controller says what it sees instead.
+const decideHoldShortReport = (
+  ctx: DecisionContext,
+  state: EngineState,
+  message: PilotMessage,
+): Decision | undefined => {
+  if (
+    message.subject !== "hold_short" ||
+    message.type === "request" ||
+    findPendingReadback(state) !== undefined ||
+    !ctx.situation.onGround
+  ) {
+    return undefined;
+  }
+
+  if (isAtActiveHoldLine(ctx, state)) {
+    return hasSeparatePositions(ctx.airport) && state.position === "ground"
+      ? handOffTo(ctx, state, "tower")
+      : requestDeparture(ctx, state);
+  }
+
+  if (ctx.situation.phase === FlightPhase.HoldingShort || ctx.situation.onRunway) {
+    return undefined;
+  }
+
+  return say(
+    {
+      type: "query",
+      query: "confirm_position",
+      claimed: "hold_short",
+      observed: ctx.situation.phase,
+    },
+    state,
+  );
+};
+
 // A reply the model judged to be repeating the pending taxi instruction is its
 // readback, whatever the classifier labeled it (the small model often labels a
 // short readback a request).
@@ -335,7 +393,8 @@ export const decidePilotMessage = (
   previous: EngineState,
   heard: PilotMessage,
 ): Decision => {
-  let state = { ...previous, contacted: true };
+  const checkIn = previous.awaitingCheckIn;
+  let state: EngineState = { ...previous, contacted: true, awaitingCheckIn: undefined };
   // "Downwind" said after "report downwind" looks like an echo of it to the
   // model. The aircraft's own position tells a report from a readback: a
   // readback of "report base" names a leg the aircraft has not reached.
@@ -379,6 +438,12 @@ export const decidePilotMessage = (
 
   state = intake.state;
 
+  const holdShortReport = decideHoldShortReport(ctx, state, message);
+
+  if (holdShortReport) {
+    return holdShortReport;
+  }
+
   switch (message.type) {
     case "request":
       return decideRequest(ctx, state, message);
@@ -391,6 +456,19 @@ export const decidePilotMessage = (
     default:
       if (asReportPoint(message.subject) || message.subject === "airborne") {
         return decidePositionReport(ctx, state, message);
+      }
+
+      // The first call to a controller who has just taken over, with nothing
+      // asked: answer it, as a controller would.
+      if (checkIn && message.type === "other" && message.subject === "other") {
+        return say(
+          {
+            type: "check_in_reply",
+            position: checkIn,
+            holdShort: isAtActiveHoldLine(ctx, state) ? state.runway : undefined,
+          },
+          state,
+        );
       }
 
       return ctx.style.strictness === "relaxed"
