@@ -16,6 +16,8 @@ export const isIntakeComplete = (intake: FlightIntake): boolean =>
 export const needsIntake = (state: EngineState): boolean =>
   state.intake !== undefined && !isIntakeComplete(state.intake);
 
+const squash = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
 const missingOf = (intake: FlightIntake): "destination" | "rules" | "both" =>
   intake.destination === undefined
     ? intake.rules === undefined
@@ -48,8 +50,16 @@ const applyDestination = (
       return { intake, clarify: judgement.options.map((option) => option.name) };
     case "unresolvable":
       return { intake: { ...intake, destination: { name: judgement.text } } };
-    case "unknown":
-      return { intake };
+    // A name we cannot place is asked for once more. Said again the same way,
+    // it is a real place missing from our data (or a speech-to-text habit), so
+    // it is taken as spoken instead of asking forever.
+    case "unknown": {
+      const same = squash(judgement.text) === intake.unrecognized;
+
+      return same
+        ? { intake: { ...intake, destination: { name: judgement.text }, unrecognized: undefined } }
+        : { intake: { ...intake, unrecognized: squash(judgement.text) } };
+    }
   }
 };
 
@@ -128,7 +138,9 @@ export const applyIntake = (
     };
   }
 
-  const next: EngineState = { ...state, intake };
+  // A departure request that arrives with only part of the plan is held back
+  // too, to be answered once the rest is given.
+  const next: EngineState = { ...state, intake, ...(gated ? { deferred: message } : {}) };
 
   if (refusedIfr) {
     const lead: AtcIntent[] = [{ type: "unable", reason: "ifr_not_available" }];

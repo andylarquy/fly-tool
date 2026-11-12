@@ -15,6 +15,11 @@ import { labDirectory } from "../directoryFixture";
 const TICK_REAL_MS = 1000;
 
 const flag = (name: string): boolean => process.argv.includes(name);
+const stringAfter = (name: string): string | undefined => {
+  const index = process.argv.indexOf(name);
+
+  return index === -1 ? undefined : process.argv[index + 1];
+};
 const numberAfter = (name: string, fallback: number): number => {
   const index = process.argv.indexOf(name);
   const value = index === -1 ? NaN : Number(process.argv[index + 1]);
@@ -49,7 +54,9 @@ async function main(): Promise<void> {
     (await store.load(DEFAULT_PILOT_PROFILE.pilotId)) ??
     createPilotRecord(DEFAULT_PILOT_PROFILE.pilotId, DEFAULT_PILOT_PROFILE.displayName);
 
-  const real = flag("--real-airports") && directoryFilesExist();
+  // The real airports whenever they are on disk: a fixture that lacks the
+  // place the pilot names looks like a bug in the controller.
+  const real = !flag("--lab-airports") && directoryFilesExist();
   let realDirectory: AirportDirectory | undefined;
   const directory = (): AirportDirectory => {
     if (real) {
@@ -90,7 +97,7 @@ async function main(): Promise<void> {
     facility: labTower,
     record,
     store,
-    callsign: DEFAULT_FLIGHT_PLAN.callsign,
+    callsign: stringAfter("--callsign") ?? DEFAULT_FLIGHT_PLAN.callsign,
     clock: () => simMs,
     epochBaseMs: Date.now(),
     directory,
@@ -244,7 +251,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Fly Tool play: a simulated aircraft at ${labAirport.name}${flag("--intake") ? ", flight plan asked" : ""}. ` +
-      `Airports: ${real ? "OurAirports" : "lab fixture"}.${HELP}`,
+      `Airports: ${real ? "OurAirports (real data)" : "lab fixture (Lab Field, Harbor Field, Hillside, Rivera Norte/Sur, Ezeiza)"}.${HELP}`,
   );
 
   session.start();

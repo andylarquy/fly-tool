@@ -108,7 +108,7 @@ doesn't have real situational grounding yet.
   with `/` (`/next` fly the next stage, `/advance <s>` fast-forward one tick
   per second, `/jump`, `/speed`, `/tune`, `/where`, `/stages`, `/quit`);
   flags: `--intake` (ask for destination and rules), `--speed <n>`,
-  `--real-airports` (OurAirports instead of the lab fixture), `--records <dir>`
+  `--lab-airports` (force the small fictional list; the default is the real OurAirports data whenever the CSVs are on disk), `--callsign <x>`, `--records <dir>`
   (where the pilot record lives; default `data/pilot-records`, so memory
   carries over between runs). Each ATC line is followed by a trace line:
   phase, what the classifier heard, and the intents. Input is handled one line
@@ -261,7 +261,7 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   wins over a "local" guess, and a "local" guess on a departure request that
   gives no rules is ignored (the model over-reports it). Naming this airport,
   or "local flight / pattern work", makes the destination this airport.
-  Several airports with the name get "Confirm destination, A or B" (full names
+  A name the directory cannot place is asked for once more; said the same way again it is taken as spoken (a real place missing from the data, or a speech-to-text habit), so the pilot is never stuck. Several airports with the name get "Confirm destination, A or B" (full names
   when the short ones would sound the same). The pilot is asked at most three
   times, then left alone (`abandoned`): the experience stays slack. Arrivals,
   emergencies, readbacks and questions are never held up.

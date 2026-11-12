@@ -23,6 +23,12 @@ export const significantTokens = (text: string): string[] => {
   return significant.length > 0 ? significant : tokens;
 };
 
+// A phrase with at least one word that says something about *which* place.
+export const hasSignificantWords = (text: string): boolean =>
+  normalize(text)
+    .split(" ")
+    .some((token) => token !== "" && !GENERIC_WORDS.has(token));
+
 export const editDistance = (a: string, b: string, limit: number): number => {
   if (Math.abs(a.length - b.length) > limit) {
     return limit + 1;

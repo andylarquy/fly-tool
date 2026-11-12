@@ -140,10 +140,19 @@ const scenarios: Scenario[] = [
     ],
   },
   {
-    name: "A destination nobody recognises is asked for again",
+    name: "A destination nobody recognises is asked for once more, then taken as said",
     steps: [
       { pilot: takeoffCall, expect: [ASK_BOTH] },
       { pilot: answer(judged({ destination: { kind: "unknown", text: "Xyzzy" }, rules: "VFR" })), expect: ["intake_question:destination"] },
+      { pilot: answer(judged({ destination: { kind: "unknown", text: "xyzzy" } })), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "A different unrecognised name does not count as the same one",
+    steps: [
+      { pilot: takeoffCall, expect: [ASK_BOTH] },
+      { pilot: answer(judged({ destination: { kind: "unknown", text: "Xyzzy" }, rules: "VFR" })), expect: ["intake_question:destination"] },
+      { pilot: answer(judged({ destination: { kind: "unknown", text: "Plugh" } })), expect: ["intake_question:destination"] },
     ],
   },
   {
@@ -184,6 +193,27 @@ const scenarios: Scenario[] = [
     steps: [
       { pilot: takeoffCall, expect: [ASK_BOTH] },
       { pilot: answer(judged({ destination: { kind: "resolved", airport: HERE }, rules: "VFR" })), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "A departure request that brings only the destination is held, and answered once the rules arrive",
+    steps: [
+      { pilot: heard(takeoffCall, judged({ destination: { kind: "resolved", airport: HARBOR } })), expect: ["intake_question:rules"] },
+      { pilot: answer(judged({ rules: "VFR" })), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "A departure request that brings only the rules is held, and answered once the destination arrives",
+    steps: [
+      { pilot: heard(takeoffCall, judged({ rules: "VFR" })), expect: ["intake_question:destination"] },
+      { pilot: answer(judged({ destination: { kind: "resolved", airport: HARBOR } })), expect: [LINE_UP] },
+    ],
+  },
+  {
+    name: "A departure request with IFR is refused and still answered once VFR arrives",
+    steps: [
+      { pilot: heard(takeoffCall, judged({ destination: { kind: "resolved", airport: HARBOR }, rules: "IFR" })), expect: ["unable:ifr_not_available", "intake_question:rules"] },
+      { pilot: answer(judged({ rules: "VFR" })), expect: [LINE_UP] },
     ],
   },
   {
@@ -302,6 +332,10 @@ function runResolution(): void {
     return result.kind === "resolved" && result.airport.id === "SZHF";
   })());
   check("Nonsense is unknown", resolve("Xyzzy").kind === "unknown");
+  check("A made-up name ending in a generic word is not matched on that word", (() => {
+    const withFields = new AirportDirectory([entry("F1", "Field", -34.0, -57.9), entry("F2", "LA Field", -34.1, -58.0)]);
+    return resolveDestination("Xyzzy Field", near, () => withFields).kind === "unknown";
+  })());
   check("With no airport data the words are kept", resolveDestination("Ezeiza", near, () => undefined).kind === "unresolvable");
   check("The spoken name of an airport drops generic words", toAirportRef(labDirectory.byCode("SZHF")!).name === "Harbor Field");
 }

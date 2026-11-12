@@ -33,6 +33,7 @@ export interface FlightDestination {
 export interface FlightIntake {
   destination?: FlightDestination;
   rules?: "VFR";
+  unrecognized?: string;
   asked: number;
   abandoned?: boolean;
 }

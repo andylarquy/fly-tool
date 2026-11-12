@@ -1,6 +1,7 @@
 import { extractFlightIntake } from "../ai/interpreter/flightIntakeExtractor";
 import { AirportDirectory } from "../directory/airportDirectory";
 import { toAirportRef } from "../directory/spokenName";
+import { hasSignificantWords } from "../directory/textMatch";
 import { DestinationJudgement } from "../domain/FlightIntake";
 import { needsIntake } from "../engine/decideIntake";
 import { verifyTaxiReadback } from "../ai/interpreter/taxiReadbackVerifier";
@@ -106,7 +107,14 @@ export const resolveDestination = (
 
   for (let drop = 1; candidates.length === 0 && drop <= 2 && words.length - drop >= 1; drop++) {
     for (const trimmed of [words.slice(drop), words.slice(0, -drop)]) {
-      const retry = airports.shortlist(trimmed.join(" "), { near: aircraft, limit: 3 });
+      const phrase = trimmed.join(" ");
+
+      // "Field" left over from "Xyzzy Field" names nothing in particular.
+      if (!hasSignificantWords(phrase)) {
+        continue;
+      }
+
+      const retry = airports.shortlist(phrase, { near: aircraft, limit: 3 });
 
       if (retry.candidates.length > 0) {
         ({ candidates, confident } = retry);
