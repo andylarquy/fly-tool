@@ -144,7 +144,7 @@ async function runClassification(): Promise<void> {
 async function runReadbackVerification(): Promise<void> {
   console.log("\n=== Taxi readback verifier ===");
 
-  const fields = { readsBack: 0, holdShortRepeated: 0, taxiwaysRepeated: 0, mentionsOtherTaxiway: 0 };
+  const fields = { readsBack: 0, holdShortRepeated: 0, taxiwaysRepeated: 0, mentionsOtherTaxiway: 0, runwayMismatch: 0 };
   let invalid = 0;
   const latencies: number[] = [];
 
@@ -154,6 +154,7 @@ async function runReadbackVerification(): Promise<void> {
       transcript: sample.transcript,
       legs: sample.taxiways.map((name) => ({ kind: "taxiway", name })),
       holdShort: sample.holdShort,
+      expectedRunway: sample.holdShort,
       callsign: "LV-INQ",
       destination: sample.destination ?? (sample.holdShort ? `runway ${sample.holdShort}` : undefined),
       knownNonTaxiways: [sample.holdShort, sample.destination].filter(
@@ -175,6 +176,7 @@ async function runReadbackVerification(): Promise<void> {
       holdShortRepeated: got.holdShortRepeated === want.holdShortRepeated,
       taxiwaysRepeated: sameSet(got.taxiwaysRepeated, want.taxiwaysRepeated),
       mentionsOtherTaxiway: got.mentionsOtherTaxiway === want.mentionsOtherTaxiway,
+      runwayMismatch: got.runwayMismatch === want.runwayMismatch,
     };
 
     (Object.keys(fields) as (keyof typeof fields)[]).forEach((key) => {

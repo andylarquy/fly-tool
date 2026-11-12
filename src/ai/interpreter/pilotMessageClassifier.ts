@@ -5,6 +5,7 @@ import {
   PILOT_MESSAGE_SYSTEM_PROMPT,
 } from "./pilotMessagePrompt";
 import { MODEL, THINKING } from "../modelConfig";
+import { isQuoted } from "./modelOutputParsing";
 import {
   PILOT_MESSAGE_SUBJECTS,
   PILOT_MESSAGE_TYPES,
@@ -17,7 +18,7 @@ export interface ClassificationResult {
   response: ChatResponse;
 }
 
-const parsePilotMessage = (raw: string): PilotMessage | undefined => {
+const parsePilotMessage = (raw: string, transcript: string): PilotMessage | undefined => {
   try {
     const parsed: unknown = JSON.parse(raw);
 
@@ -25,7 +26,7 @@ const parsePilotMessage = (raw: string): PilotMessage | undefined => {
       return undefined;
     }
 
-    const { type, runway, subject } = parsed as Record<string, unknown>;
+    const { type, runway, subject, runwayQuote } = parsed as Record<string, unknown>;
 
     const validType = PILOT_MESSAGE_TYPES.find((t) => t === type);
     const validSubject = PILOT_MESSAGE_SUBJECTS.find((s) => s === subject);
@@ -33,7 +34,9 @@ const parsePilotMessage = (raw: string): PilotMessage | undefined => {
     return validType && validSubject && typeof runway === "string"
       ? {
           type: validType,
-          runway: runway === NO_RUNWAY ? null : runway,
+          // A runway counts only if the pilot's own words name one. The model
+          // reports a runway for transmissions that do not mention any.
+          runway: runway === NO_RUNWAY || !isQuoted(transcript, runwayQuote) ? null : runway,
           subject: validSubject,
         }
       : undefined;
@@ -78,5 +81,5 @@ ${pilotTransmission}
 
   const raw = response.message.content;
 
-  return { message: parsePilotMessage(raw), raw, response };
+  return { message: parsePilotMessage(raw, pilotTransmission), raw, response };
 };

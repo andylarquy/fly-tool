@@ -250,7 +250,7 @@ export const runPipelineTurn = async (
       message &&
       taxi &&
       findPendingReadback(previous.engine)?.kind === "taxi" &&
-      ["request", "readback", "other"].includes(message.type)
+      message.type !== "emergency"
     ) {
       const verifyStart = performance.now();
       const taxiReadback = await verifyTaxiReadback({
@@ -258,6 +258,7 @@ export const runPipelineTurn = async (
         legs: taxi.legs,
         holdShort: taxi.holdShort,
         callsign,
+        expectedRunway: taxi.holdShort ?? (taxi.destination.kind === "runway" ? taxi.destination.runway : undefined),
         destination:
           taxi.destination.kind === "runway"
             ? `runway ${taxi.destination.runway}`

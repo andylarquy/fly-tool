@@ -10,7 +10,9 @@ Return JSON with:
 - taxiwayMentions: one entry for each taxiway name the pilot actually said, in order.
   - said: the exact words the pilot used for that taxiway.
   - matches: which expected taxiway it is, using the name exactly as written in the expected instruction, or "other" if it is not one of the expected taxiways.
-  Runway numbers, parking names, and the aircraft callsign are not taxiways. If the pilot named no taxiway, return an empty list. Never list a taxiway the pilot did not say.`;
+  Runway numbers, parking names, and the aircraft callsign are not taxiways. If the pilot named no taxiway, return an empty list. Never list a taxiway the pilot did not say.
+- runwayQuote: the exact words from the PILOT TRANSMISSION in which the pilot names a runway ("runway 21", "pista 05", "hold short of 23"). Use an empty string if the pilot named no runway. Never invent words.
+- runway: that runway as digits, with L, R or C if the pilot said it (for example "21" or "05L"), even if it was spoken as words ("two one"). Use "none" if the pilot named no runway.`;
 
 export const OTHER_TAXIWAY = "other";
 
@@ -19,6 +21,8 @@ export const buildTaxiReadbackSchema = (expectedNames: string[]) => ({
   properties: {
     readsBack: { type: "boolean" },
     holdShortQuote: { type: "string" },
+    runwayQuote: { type: "string" },
+    runway: { type: "string" },
     taxiwayMentions: {
       type: "array",
       items: {
@@ -31,5 +35,5 @@ export const buildTaxiReadbackSchema = (expectedNames: string[]) => ({
       },
     },
   },
-  required: ["readsBack", "holdShortQuote", "taxiwayMentions"],
+  required: ["readsBack", "holdShortQuote", "runwayQuote", "runway", "taxiwayMentions"],
 });

@@ -108,7 +108,7 @@ doesn't have real situational grounding yet.
   with `/` (`/next` fly the next stage, `/advance <s>` fast-forward one tick
   per second, `/jump`, `/speed`, `/tune`, `/where`, `/stages`, `/quit`);
   flags: `--intake` (ask for destination and rules), `--speed <n>`,
-  `--lab-airports` (force the small fictional list; the default is the real OurAirports data whenever the CSVs are on disk), `--callsign <x>`, `--records <dir>`
+  `--lab-airports` (force the small fictional list; the default is the real OurAirports data whenever the CSVs are on disk), `--callsign <x>` (a mistyped option is reported, not ignored), `--records <dir>`
   (where the pilot record lives; default `data/pilot-records`, so memory
   carries over between runs). Each ATC line is followed by a trace line:
   phase, what the classifier heard, and the intents. Input is handled one line
@@ -363,7 +363,15 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   - `interpreter/` — language -> structured JSON (pilot side). Files named
     `*Prompt.ts` hold a stage's system prompt and JSON schema.
     - `pilotMessageClassifier.ts` — `classifyPilotMessage`, Ollama structured
-      output, stateless. Prompt/schema in `pilotMessagePrompt.ts`.
+      output, stateless. Prompt/schema in `pilotMessagePrompt.ts`. The runway
+      is an enum of the airport's runways plus `other` (a runway the airport
+      does not have: without it "runway 21" was erased to "none", which reads
+      as "no runway named", so a wrong-runway readback went unnoticed) and
+      `none`; it must come with `runwayQuote`, and the runway is kept only if
+      that quote really occurs in the transmission (`isQuoted`), because the
+      model otherwise reports runways on transmissions that name none. The
+      quote is the *last* schema field and prompt paragraph: placed first it
+      dragged message-type accuracy down 10 points.
     - `emergencyDetailsExtractor.ts` / `emergencyDetailsPrompt.ts` — a second,
       separate call (`extractEmergencyDetails`) that the pipeline only makes
       when the message is an emergency or one is already active. Kept out of
@@ -377,7 +385,13 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       (a plain substring test), and drops "other" mentions that are really the
       destination, a runway, or the callsign (known from our own data). Yes/no
       judgements alone were loose enough to give false "wrong taxiway" alarms.
-      A call on a rare path (only during a pending taxi readback), ~1.8 s.
+      It also returns the runway the pilot said (with a quote, "two one" read
+      as 21) and code compares it, as data, with the runway ATC issued
+      (`runwayMismatch`): a wrong runway is corrected at every strictness. It
+      runs for *any* reply (not an emergency) while a taxi instruction awaits
+      its readback, because the classifier labels a readback a request, other
+      or position report; a reply the model judges to be a readback is treated
+      as one whatever the label. Only during a pending taxi readback, ~2.5 s.
     - `flightIntakeExtractor.ts` / `flightIntakePrompt.ts` — pulls the
       destination (in the pilot's own words), the flight rules and a
       local-flight flag out of a reply, with the callsign and the last ATC line

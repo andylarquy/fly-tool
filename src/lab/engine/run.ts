@@ -73,6 +73,13 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
+    name: "A readback with a runway this airport does not have is corrected",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 2000, phase: P.LinedUp, pilot: msg("readback", "other", "takeoff"), expect: ["correct_readback"] },
+    ],
+  },
+  {
     name: "Wrong clearance in readback is corrected",
     steps: [
       { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },

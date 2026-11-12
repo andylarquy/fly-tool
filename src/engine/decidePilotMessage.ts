@@ -159,7 +159,7 @@ const checkTaxiFidelity = (
   const taxi = state.taxi;
   const heard = message.taxiReadback;
 
-  if (!taxi || !heard || style.strictness === "relaxed") {
+  if (!taxi || !heard) {
     return undefined;
   }
 
@@ -175,6 +175,15 @@ const checkTaxiFidelity = (
     ...state,
     taxi: { ...taxi, readbackRejections: rejections + 1 },
   };
+
+  // A wrong runway is corrected whatever the controller's strictness.
+  if (heard.runwayMismatch) {
+    return repeatTaxiInstruction(counted, "readback_error");
+  }
+
+  if (style.strictness === "relaxed") {
+    return undefined;
+  }
 
   if (heard.mentionsOtherTaxiway) {
     return repeatTaxiInstruction(counted, "readback_error");
@@ -318,7 +327,7 @@ const decideQuestion = (
 // short readback a request).
 const isTaxiReadback = (state: EngineState, message: PilotMessage): boolean =>
   message.taxiReadback?.readsBack === true &&
-  (message.type === "request" || message.type === "other") &&
+  (message.type === "request" || message.type === "other" || message.type === "position_report") &&
   findPendingReadback(state)?.kind === "taxi";
 
 export const decidePilotMessage = (

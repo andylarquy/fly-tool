@@ -300,6 +300,7 @@ const judged = (overrides: Partial<TaxiReadbackJudgement> = {}): TaxiReadbackJud
   holdShortRepeated: true,
   taxiwaysRepeated: ["C", "A", "B"],
   mentionsOtherTaxiway: false,
+  runwayMismatch: false,
   ...overrides,
 });
 
@@ -346,6 +347,42 @@ const scenarios: Scenario[] = [
         position: A.rampSpot,
         pilot: msg("readback", "05", "taxi"),
         expect: ["taxi_instruction:readback_error:runway 23:C+A+B:hold 23"],
+      },
+    ],
+  },
+  {
+    name: "Strict: a wrong runway in the readback is corrected with the route",
+    strictness: "strict",
+    steps: [requestFromRamp, readback(judged({ runwayMismatch: true }), [REPEAT_ROUTE])],
+  },
+  {
+    name: "Normal: a wrong runway in the readback is corrected with the route",
+    steps: [requestFromRamp, readback(judged({ runwayMismatch: true }), [REPEAT_ROUTE])],
+  },
+  {
+    name: "Relaxed: a wrong runway in the readback is still corrected",
+    strictness: "relaxed",
+    steps: [requestFromRamp, readback(judged({ runwayMismatch: true }), [REPEAT_ROUTE])],
+  },
+  {
+    name: "A readback the classifier called a position report is still checked",
+    steps: [
+      requestFromRamp,
+      {
+        position: A.rampSpot,
+        pilot: { ...msg("position_report", null, "taxi"), taxiReadback: judged({ runwayMismatch: true }) },
+        expect: [REPEAT_ROUTE],
+      },
+    ],
+  },
+  {
+    name: "A position report that is not a readback is left alone",
+    steps: [
+      requestFromRamp,
+      {
+        position: A.rampSpot,
+        pilot: { ...msg("position_report", null, "taxi"), taxiReadback: judged({ readsBack: false, holdShortRepeated: false, taxiwaysRepeated: [] }) },
+        expect: [],
       },
     ],
   },

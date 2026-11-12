@@ -73,6 +73,16 @@ export const samples: ClassificationSample[] = [
     expected: msg("readback", "05", "takeoff"),
   },
   {
+    pilot: "Cleared for takeoff runway 21, LV-INQ.",
+    lastAtc: "LV-INQ, cleared for takeoff runway 23.",
+    expected: msg("readback", "other", "takeoff"),
+  },
+  {
+    pilot: "Autorizado a despegar pista 21, LV-INQ.",
+    lastAtc: "LV-INQ, autorizado a despegar pista 23.",
+    expected: msg("readback", "other", "takeoff"),
+  },
+  {
     pilot: "Cleared to land runway 23, LV-INQ.",
     lastAtc: "LV-INQ, cleared to land runway 23.",
     expected: msg("readback", "23", "landing"),

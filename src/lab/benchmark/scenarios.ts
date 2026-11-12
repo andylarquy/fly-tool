@@ -242,6 +242,40 @@ export const scenarios: BenchmarkScenario[] = [
     ],
   },
   {
+    name: "A taxi readback with a runway this airport does not have is corrected",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxiing to hold short of runway 21 via Charlie, Alpha, Bravo, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["negative", "taxi to runway 23", "charlie, alpha, bravo"],
+          forbiddenPatterns: ["runway 21"],
+        },
+      },
+    ],
+  },
+  {
+    name: "A taxi readback with the other runway of this airport is corrected",
+    section: "Ground",
+    origin: "new",
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "Taxi to runway 05 via Charlie, Alpha, Bravo, hold short runway 05, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["negative", "taxi to runway 23"],
+          forbiddenPatterns: ["runway 05"],
+        },
+      },
+    ],
+  },
+  {
     name: "A taxi readback without hold short is sent back",
     section: "Ground",
     origin: "new",
@@ -636,6 +670,23 @@ export const scenarios: BenchmarkScenario[] = [
           responseRequired: true,
           requiredConcepts: ["23"],
           forbiddenPatterns: ["runway 05"],
+        },
+      },
+    ],
+  },
+  {
+    name: "Takeoff readback with a runway this airport does not have",
+    section: "Readbacks",
+    origin: "new",
+    steps: [
+      clearedForTakeoff,
+      {
+        position: positions.linedUp,
+        pilot: "Cleared for takeoff runway 21, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["negative", "cleared for takeoff", "23"],
+          forbiddenPatterns: ["runway 21"],
         },
       },
     ],

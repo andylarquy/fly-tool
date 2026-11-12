@@ -18,7 +18,7 @@ type:
 - emergency: the pilot declares MAYDAY or PAN-PAN, or reports an emergency.
 - other: greetings, thanks, or anything else.
 
-runway: the runway the pilot refers to. The pilot may omit the word "runway" ("land on 05"), speak the digits ("zero five", "two three"), or speak another language. Use "none" only when the pilot names no runway.
+runway: the runway the pilot refers to. The pilot may omit the word "runway" ("land on 05"), speak the digits ("zero five", "two three"), or speak another language. When the pilot names a runway in the list, use that value, even if it differs from what ATC said. Use "other" only when the pilot names a runway number that is NOT in the list. Use "none" when the pilot names no runway.
 
 subject:
 - takeoff: departure or takeoff clearance, or being ready to depart.
@@ -37,17 +37,24 @@ subject:
 - final: the pilot is on final or short final.
 - go_around: going around or missed approach.
 - weather: wind, pressure, visibility, or other weather information.
-- other: anything that fits none of the above, such as the active runway, acknowledgements, greetings.`;
+- other: anything that fits none of the above, such as the active runway, acknowledgements, greetings.
+
+runwayQuote: the exact words from the PILOT TRANSMISSION in which the pilot names a runway ("runway 05", "land on 23", "pista 21"). Use an empty string if the pilot names no runway. Never invent words.`;
 
 // A null inside the enum makes Ollama's constrained decoding always pick null.
 export const NO_RUNWAY = "none";
+
+// The pilot named a runway, just not one this airport has. Without this the
+// schema forced it to "none", which reads as "no runway mentioned".
+export const OTHER_RUNWAY = "other";
 
 export const buildPilotMessageSchema = (runways: string[]) => ({
   type: "object",
   properties: {
     type: { type: "string", enum: [...PILOT_MESSAGE_TYPES] },
-    runway: { type: "string", enum: [...runways, NO_RUNWAY] },
+    runway: { type: "string", enum: [...runways, OTHER_RUNWAY, NO_RUNWAY] },
     subject: { type: "string", enum: [...PILOT_MESSAGE_SUBJECTS] },
+    runwayQuote: { type: "string" },
   },
-  required: ["type", "runway", "subject"],
+  required: ["type", "runway", "subject", "runwayQuote"],
 });

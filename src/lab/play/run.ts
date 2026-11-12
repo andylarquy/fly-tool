@@ -2,6 +2,7 @@ import * as readline from "node:readline";
 import { FlightSession } from "../../app/flightSession";
 import { AirportDirectory } from "../../directory/airportDirectory";
 import { directoryFilesExist, loadOurAirports } from "../../directory/ourAirports";
+import { editDistance } from "../../directory/textMatch";
 import { DEFAULT_FLIGHT_PLAN } from "../../domain/defaultFlightPlan";
 import { DEFAULT_PILOT_PROFILE } from "../../domain/defaultPilot";
 import { JsonPilotRecordStore } from "../../memory/jsonPilotRecordStore";
@@ -47,7 +48,24 @@ const clockText = (ms: number): string => {
   return `${pad(Math.floor(total / 3600))}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
 };
 
+const KNOWN_FLAGS = ["--intake", "--speed", "--lab-airports", "--callsign", "--records"];
+
+// A mistyped option silently does nothing, which is how a "--callsing" went
+// unnoticed: say so, and say what was probably meant.
+const warnAboutUnknownFlags = (): void => {
+  for (const argument of process.argv.slice(2)) {
+    if (argument.startsWith("--") && !KNOWN_FLAGS.includes(argument)) {
+      const closest = KNOWN_FLAGS.find((known) => editDistance(argument, known, 3) <= 3);
+
+      console.warn(
+        `Unknown option ${argument}, ignored.${closest ? ` Did you mean ${closest}?` : ""} Options: ${KNOWN_FLAGS.join(", ")}.`,
+      );
+    }
+  }
+};
+
 async function main(): Promise<void> {
+  warnAboutUnknownFlags();
   const recordsAt = process.argv.indexOf("--records");
   const store = new JsonPilotRecordStore(recordsAt === -1 ? undefined : process.argv[recordsAt + 1]);
   const record =

@@ -41,6 +41,7 @@ export interface TaxiReadbackJudgement {
   holdShortRepeated: boolean;
   taxiwaysRepeated: string[];
   mentionsOtherTaxiway: boolean;
+  runwayMismatch: boolean;
 }
 
 export interface PilotMessage {

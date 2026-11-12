@@ -3,6 +3,7 @@ import { TaxiLeg } from "../../domain/Taxi";
 import { TaxiReadbackJudgement } from "../../domain/PilotMessage";
 import { spokenLetter, spokenTaxiway } from "../../utils/phonetic";
 import { MODEL, THINKING } from "../modelConfig";
+import { isQuoted } from "./modelOutputParsing";
 import {
   buildTaxiReadbackSchema,
   OTHER_TAXIWAY,
@@ -14,16 +15,10 @@ export interface TaxiReadbackInput {
   legs: TaxiLeg[];
   holdShort?: string;
   destination?: string;
+  expectedRunway?: string;
   callsign?: string;
   knownNonTaxiways?: string[];
 }
-
-// A quote only counts if it really is in what the pilot said. That is a plain
-// substring test, so it holds in any language.
-const isQuoted = (transcript: string, quote: unknown): quote is string =>
-  typeof quote === "string" &&
-  quote.trim().length > 0 &&
-  transcript.toLowerCase().includes(quote.trim().toLowerCase());
 
 // A mention that is really the destination or a runway, which the engine knows
 // from its own data, is not a wrong taxiway.
@@ -37,11 +32,36 @@ const namesKnownNonTaxiway = (said: string, known: string[]): boolean => {
   });
 };
 
+const designator = (text: string): string | undefined => {
+  const match = /^\s*0*(\d{1,2})\s*([LRClrc]?)\s*$/.exec(text);
+
+  return match ? `${match[1].padStart(2, "0")}${match[2].toUpperCase()}` : undefined;
+};
+
+// A runway number is data, so it is compared as data: only when the model's
+// quote really is in the transcript, and only against the runway we issued.
+const isWrongRunway = (
+  fields: Record<string, unknown>,
+  transcript: string,
+  expectedRunway?: string,
+): boolean => {
+  const said = typeof fields.runway === "string" ? designator(fields.runway) : undefined;
+  const expected = expectedRunway ? designator(expectedRunway) : undefined;
+
+  return (
+    said !== undefined &&
+    expected !== undefined &&
+    isQuoted(transcript, fields.runwayQuote) &&
+    said !== expected
+  );
+};
+
 const parseJudgement = (
   raw: string,
   transcript: string,
   expected: string[],
   knownNonTaxiways: string[],
+  expectedRunway?: string,
 ): TaxiReadbackJudgement | undefined => {
   try {
     const fields = JSON.parse(raw) as Record<string, unknown>;
@@ -60,6 +80,7 @@ const parseJudgement = (
     );
 
     return {
+      runwayMismatch: isWrongRunway(fields, transcript, expectedRunway),
       readsBack: fields.readsBack,
       holdShortRepeated: isQuoted(transcript, fields.holdShortQuote),
       taxiwaysRepeated: [
@@ -86,6 +107,7 @@ export const verifyTaxiReadback = async ({
   legs,
   holdShort,
   destination,
+  expectedRunway,
   callsign,
   knownNonTaxiways = [],
 }: TaxiReadbackInput): Promise<TaxiReadbackJudgement | undefined> => {
@@ -121,5 +143,5 @@ ${transcript}
   return parseJudgement(response.message.content, transcript, expected, [
     ...knownNonTaxiways,
     ...(callsign ? [callsign, spokenCallsign(callsign)] : []),
-  ]);
+  ], expectedRunway);
 };

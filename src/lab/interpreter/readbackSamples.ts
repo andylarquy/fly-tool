@@ -13,7 +13,14 @@ const verdict = (
   holdShortRepeated: boolean,
   taxiwaysRepeated: string[],
   mentionsOtherTaxiway = false,
-): TaxiReadbackJudgement => ({ readsBack, holdShortRepeated, taxiwaysRepeated, mentionsOtherTaxiway });
+  runwayMismatch = false,
+): TaxiReadbackJudgement => ({
+  readsBack,
+  holdShortRepeated,
+  taxiwaysRepeated,
+  mentionsOtherTaxiway,
+  runwayMismatch,
+});
 
 const CAB = ["C", "A", "B"];
 
@@ -97,5 +104,29 @@ export const readbackSamples: ReadbackSample[] = [
   {
     transcript: "Ready for departure, LV-INQ.",
     taxiways: CAB, holdShort: "23", expected: verdict(false, false, []),
+  },
+  {
+    transcript: "Taxiing to hold short of runway 21 via Charli, Alpha, Bravo, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
+  },
+  {
+    transcript: "Rodaje a pista 21 por Charlie, Alpha, Bravo, mantengo antes de pista 21, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
+  },
+  {
+    transcript: "Taxi to runway two one via Charlie, Alpha, Bravo, hold short runway two one, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
+  },
+  {
+    transcript: "Taxi to runway two three via Charlie, Alpha, Bravo, hold short two three, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "Taxi to runway 5 via Alpha one, Bravo, hold short runway 5, LV-INQ.",
+    taxiways: ["A1", "B"], holdShort: "05", expected: verdict(true, true, ["A1", "B"]),
+  },
+  {
+    transcript: "Taxi to runway 05 via Charlie, Alpha, Bravo, hold short runway 05, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
   },
 ];
