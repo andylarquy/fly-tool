@@ -91,6 +91,10 @@ doesn't have real situational grounding yet.
   on `labAirportSingleController` (no frequencies) so they keep covering the
   single-controller behavior; handoff scenarios use `labAirport`. Exits
   non-zero on any failure.
+- `npm run lab:directory` — build + run `src/lab/directory/run.js`.
+  Deterministic: CSV parsing, text matching and the shortlist on a small
+  fixture; the loader on inline CSV; and, if the CSVs are present, checks
+  against the real snapshot (skipped otherwise).
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
@@ -246,6 +250,23 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   gitignored root-level `/data/pilot-records/`, atomic write). The pipeline
   keeps the live record in `PipelineState`; the *caller* decides when to
   `save` it. Sanitized pilot ids can collide (`a/b` and `a_b` share a file).
+- `src/directory/` — knowing which airport a pilot means (no LLM, no sim).
+  `ourAirports.ts` parses the OurAirports CSVs in `datasets/ourairports/`
+  (gitignored, see its README; ~0.4 s to parse 72k airports) into
+  `AirportEntry` (`domain/AirportEntry.ts`: codes, names, aliases from the
+  name + municipality + keywords, position, type, joined frequencies); closed
+  airports and rows with no position are dropped. `airportDirectory.ts`
+  `shortlist(spoken, {near})` returns ranked candidates and whether the best is
+  `confident` (clear lead over the second): exact codes, then word matching
+  that ignores accents, case and generic words ("airport", "aeropuerto de"),
+  tolerates a typo in long words, needs every query word to match something,
+  and weighs airport size and distance from `near` (so "Moron" near Buenos
+  Aires is the Argentine one). An ambiguous result is meant to make the
+  controller confirm, not guess. Index build is ~0.2 s and shortlist ~50-90 ms
+  over the full set. Aliases such as "Aeroparque" are only as good as the
+  data's keywords; a local alias file is still to come.
+- `src/utils/csv.ts` — RFC 4180 parser (quoted commas, doubled quotes, line
+  breaks); an empty number field must not become 0.
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
 - `src/utils/frequency.ts` — how a frequency is written (118.1, 118.125).
 - `src/utils/phonetic.ts` — the phonetic alphabet, used only to *speak* taxiways

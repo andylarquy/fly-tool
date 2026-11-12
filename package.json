@@ -14,6 +14,7 @@
     "lab:chat": "npm run build && node dist/lab/chat/run.js",
     "lab:benchmark": "npm run build && node dist/lab/benchmark/run.js",
     "lab:interpreter": "npm run build && node dist/lab/interpreter/run.js",
+    "lab:directory": "npm run build && node dist/lab/directory/run.js",
     "lab:engine": "npm run build && node dist/lab/engine/run.js",
     "lab:taxi": "npm run build && node dist/lab/taxi/run.js",
     "lab:memory": "npm run build && node dist/lab/memory/run.js",
