@@ -19,6 +19,7 @@ import {
 import { ask, clear, instructReport, say, silent } from "./intentBuilders";
 import {
   asReportPoint,
+  isOnNamedLeg,
   isClaimCompatible,
   nextReportForPhase,
   reportAfter,
@@ -326,9 +327,14 @@ export const decidePilotMessage = (
   heard: PilotMessage,
 ): Decision => {
   let state = { ...previous, contacted: true };
+  // "Downwind" said after "report downwind" looks like an echo of it to the
+  // model. The aircraft's own position tells a report from a readback: a
+  // readback of "report base" names a leg the aircraft has not reached.
   const message: PilotMessage = isTaxiReadback(state, heard)
     ? { ...heard, type: "readback" }
-    : heard;
+    : heard.type === "readback" && isOnNamedLeg(heard.subject, ctx.situation.phase)
+      ? { ...heard, type: "position_report" }
+      : heard;
 
   if (message.type === "emergency" || (state.emergency && hasEmergencyDetails(message))) {
     return decideEmergency(ctx, state, message);

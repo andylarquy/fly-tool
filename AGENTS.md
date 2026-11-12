@@ -101,6 +101,24 @@ doesn't have real situational grounding yet.
   destination lookup over `lab/directoryFixture.ts` (fictional airports around
   the Lab Field). The extractor itself is evaluated by
   `npm run lab:interpreter -- --intake`.
+- `npm run lab:play` — build + run `src/lab/play/run.js`. The playable end to
+  end: type radio calls as the pilot and step a *simulated* aircraft through
+  the standard pattern flight, with the real pipeline (classifier, engine,
+  renderer) answering and speaking up on its own. Needs Ollama. Commands start
+  with `/` (`/next` fly the next stage, `/advance <s>` fast-forward one tick
+  per second, `/jump`, `/speed`, `/tune`, `/where`, `/stages`, `/quit`);
+  flags: `--intake` (ask for destination and rules), `--speed <n>`,
+  `--real-airports` (OurAirports instead of the lab fixture), `--records <dir>`
+  (where the pilot record lives; default `data/pilot-records`, so memory
+  carries over between runs). Each ATC line is followed by a trace line:
+  phase, what the classifier heard, and the intents. Input is handled one line
+  at a time.
+- `npm run lab:sim` — build + run `src/lab/sim/run.js`. Deterministic: flies
+  the simulated aircraft through the whole standard flight with the real
+  situation derivation (the phases arrive in order with no flicker, lift-off
+  and touchdown once, a gentle touchdown rate), and tests `FlightSession` with
+  a slow fake pipeline (ticks dropped while a turn runs, pilot lines in order,
+  telemetry read when the turn runs, failures survived, stop saves once).
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
@@ -255,7 +273,28 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   remarks follow the landing quality. They need `DecisionContext.memory`;
   without it the engine never remarks.
   Readback checks always correct a wrong runway/clearance; a missing runway is
-  tolerated unless strictness is "strict". Not wired into `index.ts`.
+  tolerated unless strictness is "strict". A leg call ("downwind", "airborne")
+  that the classifier labeled a readback is a position report when the
+  aircraft really is on that leg (the model takes "downwind" after "report
+  downwind" for an echo); a readback of "report base" while on downwind names a
+  different leg and stays a readback. Not wired into `index.ts`.
+- `src/sim/` — a stand-in simulator. `pathFollower.ts` moves a point along
+  legs of runway-frame specs (headings take the short way round, lift-off and
+  touch-down happen halfway through the leg that crosses), `standardFlight.ts`
+  is a left-hand pattern flight in nine stages (taxi, line up, take off,
+  crosswind, downwind, base, final, land, taxi in), `simulatedSimulator.ts`
+  wraps it in the `SimulatorAdapter` interface so the application cannot tell
+  it from MSFS, and `runwayFrame.ts` turns a runway-frame spec into
+  `AircraftState`.
+- `src/app/` — `FlightSession`, the live loop, independent of any simulator:
+  the simulator pushes telemetry, a timer calls `tick()`, the pilot calls
+  `say()`. The pipeline is stateful, so turns run strictly one at a time:
+  pilot lines queue in order, a tick that finds a turn in flight is dropped
+  (the next one has fresher telemetry), each turn reads the latest telemetry
+  when it *runs*, a failing turn is reported and the loop carries on, and
+  `stop()` waits for the turn in flight and saves the pilot record. Not yet
+  used by `index.ts` (still the single-call path); wiring MSFS means giving it
+  `MsfsSimulator` and a nearest-airport source.
 - `src/pipeline/` — `runPipelineTurn`: one tick/turn through classify ->
   `deriveSituation` -> `decide` -> `renderTransmission`, returning the
   transmission plus a trace. Owns no hidden state; the caller passes and

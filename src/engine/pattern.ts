@@ -33,6 +33,24 @@ const COMPATIBLE_CLAIMS: Partial<Record<FlightPhase, ReportPoint[]>> = {
   [FlightPhase.Final]: ["final"],
 };
 
+const PHASE_OF_POINT: Record<ReportPoint, FlightPhase> = {
+  crosswind: FlightPhase.Crosswind,
+  downwind: FlightPhase.Downwind,
+  base: FlightPhase.Base,
+  final: FlightPhase.Final,
+};
+
+// The aircraft really is on the leg the pilot names, so this is a position
+// report whatever the classifier called it.
+export const isOnNamedLeg = (subject: PilotMessageSubject, phase: FlightPhase): boolean => {
+  const point = REPORT_POINTS.find((candidate) => candidate === subject);
+
+  return (
+    (point !== undefined && PHASE_OF_POINT[point] === phase) ||
+    (subject === "airborne" && phase === FlightPhase.Upwind)
+  );
+};
+
 export const asReportPoint = (
   subject: PilotMessageSubject,
 ): ReportPoint | undefined => REPORT_POINTS.find((point) => point === subject);

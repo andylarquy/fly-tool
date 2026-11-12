@@ -118,6 +118,28 @@ const scenarios: EngineScenario[] = [
     ],
   },
   {
+    name: "A downwind call the model labeled a readback is still a position report",
+    steps: [
+      { atMs: 0, phase: P.Inbound, pilot: msg("request", "23", "pattern_entry"), expect: ["instruct:enter_pattern"] },
+      { atMs: 30000, phase: P.Downwind, pilot: msg("readback", "23", "downwind"), expect: ["instruct:report"] },
+    ],
+  },
+  {
+    name: "A readback of 'report base' while still on downwind stays a readback",
+    steps: [
+      { atMs: 0, phase: P.Inbound, pilot: msg("request", "23", "pattern_entry"), expect: ["instruct:enter_pattern"] },
+      { atMs: 30000, phase: P.Downwind, pilot: msg("position_report", "23", "downwind"), expect: ["instruct:report"] },
+      { atMs: 32000, phase: P.Downwind, pilot: msg("readback", null, "base"), expect: [] },
+    ],
+  },
+  {
+    name: "An 'airborne' call labeled a readback on the climb-out is a position report",
+    steps: [
+      { atMs: 0, phase: P.LinedUp, pilot: msg("request", "23", "takeoff"), expect: ["issue_clearance:takeoff"] },
+      { atMs: 40000, phase: P.Upwind, pilot: msg("readback", null, "airborne"), expect: ["instruct:report"] },
+    ],
+  },
+  {
     name: "Pattern entry from outside",
     steps: [
       { atMs: 0, phase: P.Inbound, pilot: msg("request", "23", "pattern_entry"), expect: ["instruct:enter_pattern"] },
