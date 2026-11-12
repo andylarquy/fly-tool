@@ -95,6 +95,12 @@ doesn't have real situational grounding yet.
   Deterministic: CSV parsing, text matching and the shortlist on a small
   fixture; the loader on inline CSV; and, if the CSVs are present, checks
   against the real snapshot (skipped otherwise).
+- `npm run lab:intake` — build + run `src/lab/intake/run.js`. Deterministic:
+  the intake dialogue state machine with scripted model verdicts (volunteered,
+  partial, IFR, ambiguous, unknown, local, abandoned, never held up) and the
+  destination lookup over `lab/directoryFixture.ts` (fictional airports around
+  the Lab Field). The extractor itself is evaluated by
+  `npm run lab:interpreter -- --intake`.
 - `npm run lab:memory` — build + run `src/lab/memory/memory.js`. Deterministic
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
@@ -156,7 +162,7 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   helpers on `EngineState`), `engineState.ts` (`createEngineState`),
   `intentBuilders.ts` (`silent`/`say`/`ask`/`clear`), `decisionTypes.ts`,
   `decideTaxi.ts` (ground guidance, below), `positions.ts` (who the pilot is
-  talking to, below).
+  talking to, below), `decideIntake.ts` (the flight plan dialogue, below).
   `decide(input,
   state)` takes the classified `PilotMessage` (or none/unintelligible), the
   `Situation`, `FlightEvent`s and a `ControllerStyle`, and returns
@@ -226,6 +232,21 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   handoffs: arriving at a runway hold line after a taxi goes ground -> tower;
   after a landing, once the aircraft is off the runway, tower -> ground
   (`awaitingGroundHandoff`, set by the touchdown event).
+  Flight intake (`decideIntake.ts`, opt-in via
+  `createEngineState(runway, { askFlightIntake: true })`; off by default so the
+  older scenarios are unchanged): the first departure call (taxi, takeoff, line
+  up, hold short) with no flight plan is answered with "Say destination and
+  flight rules" and *held back*; once the plan is complete the held-back
+  request is answered. Pilots who give the plan up front, or only part of it,
+  are asked only for the rest. VFR is accepted; IFR is refused ("IFR is not
+  available") and the rules asked again. A destination the pilot named always
+  wins over a "local" guess, and a "local" guess on a departure request that
+  gives no rules is ignored (the model over-reports it). Naming this airport,
+  or "local flight / pattern work", makes the destination this airport.
+  Several airports with the name get "Confirm destination, A or B" (full names
+  when the short ones would sound the same). The pilot is asked at most three
+  times, then left alone (`abandoned`): the experience stays slack. Arrivals,
+  emergencies, readbacks and questions are never held up.
   Remarks (`engine/remarks.ts`) are optional flavor appended to a plain
   reply (`issue_clearance`/`instruct`/`advise`/`acknowledge`) only when:
   not strict, no emergency, past a 120 s gap since the last remark, once per
@@ -318,6 +339,20 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       destination, a runway, or the callsign (known from our own data). Yes/no
       judgements alone were loose enough to give false "wrong taxiway" alarms.
       A call on a rare path (only during a pending taxi readback), ~1.8 s.
+    - `flightIntakeExtractor.ts` / `flightIntakePrompt.ts` — pulls the
+      destination (in the pilot's own words), the flight rules and a
+      local-flight flag out of a reply, with the callsign and the last ATC line
+      as context (a bare name only means a destination because the controller
+      just asked). Every field is an enum with an explicit "none" (a boolean
+      for "local" was over-asserted on any transmission without a destination).
+      A destination is kept only if the pilot actually said it, or if it is a
+      code whose letters are the initials of consecutive spoken words. The
+      pipeline then resolves it in `src/directory/` (`resolveDestination`:
+      confident match, or two options, or "unknown"; a spelled code
+      ("Sierra Alpha Echo Zulu") is tried through its initials only when the
+      words did not already name an airport; cue words such as "destino" in
+      front of the name are dropped on a retry). It runs only while the plan is
+      incomplete.
     - `modelOutputParsing.ts` — small shared helpers for validating model
       output.
   - `renderer/` — `AtcIntent[]` -> the controller's words (ATC side).

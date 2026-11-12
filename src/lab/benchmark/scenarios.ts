@@ -60,7 +60,138 @@ const requestTaxi: BenchmarkStep = {
   pilot: "Ground, LV-INQ, request taxi for departure.",
 };
 
+const askIntake: BenchmarkExpectations = {
+  responseRequired: true,
+  requiredConcepts: ["say destination", "flight rules"],
+  forbiddenPatterns: ["taxi to", "cleared"],
+};
+
+const taxiRoute: BenchmarkExpectations = {
+  responseRequired: true,
+  requiredConcepts: ["taxi to runway 23", "charlie, alpha, bravo"],
+  forbiddenPatterns: ["say destination", "not available"],
+};
+
 export const scenarios: BenchmarkScenario[] = [
+  /* ===================================================================== */
+  /* FLIGHT INTAKE                                                         */
+  /* ===================================================================== */
+
+  {
+    name: "With no flight plan, the first call is answered with a question",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [withExpectation(requestTaxi, askIntake)],
+  },
+  {
+    name: "Answering the question gets the held-back taxi route",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      withExpectation(
+        { position: positions.rampSpot, pilot: "VFR to Harbor Field, LV-INQ." },
+        taxiRoute,
+      ),
+    ],
+  },
+  {
+    name: "A pilot who gives the flight plan up front is not asked",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      {
+        position: positions.rampSpot,
+        pilot: "Ground, LV-INQ, request taxi, VFR to Harbor Field.",
+        expect: taxiRoute,
+      },
+    ],
+  },
+  {
+    name: "IFR is refused and the rules are asked again",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "IFR to Harbor Field, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["ifr is not available", "flight rules"],
+          forbiddenPatterns: ["taxi to", "cleared"],
+        },
+      },
+      { position: positions.rampSpot, pilot: "VFR, LV-INQ.", expect: taxiRoute },
+    ],
+  },
+  {
+    name: "Two airports with one name are offered back",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      {
+        position: positions.rampSpot,
+        pilot: "VFR to Rivera, LV-INQ.",
+        expect: {
+          responseRequired: true,
+          requiredConcepts: ["confirm destination", "rivera norte", "rivera sur"],
+          forbiddenPatterns: ["taxi to"],
+        },
+      },
+      {
+        position: positions.rampSpot,
+        pilot: "Rivera Norte, LV-INQ.",
+        expect: taxiRoute,
+      },
+    ],
+  },
+  {
+    name: "A destination spelled out letter by letter is understood",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      withExpectation(
+        { position: positions.rampSpot, pilot: "Sierra Alpha Echo Zulu, VFR, LV-INQ." },
+        taxiRoute,
+      ),
+    ],
+  },
+  {
+    name: "A local flight needs only the rules",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      withExpectation(
+        { position: positions.rampSpot, pilot: "Staying in the pattern, VFR, LV-INQ." },
+        taxiRoute,
+      ),
+    ],
+  },
+  {
+    name: "The destination can be given in Spanish",
+    section: "Intake",
+    origin: "new",
+    askFlightIntake: true,
+    steps: [
+      requestTaxi,
+      withExpectation(
+        { position: positions.rampSpot, pilot: "Destino Harbor Field, reglas visuales, LV-INQ." },
+        taxiRoute,
+      ),
+    ],
+  },
+
   /* ===================================================================== */
   /* GROUND                                                                */
   /* ===================================================================== */

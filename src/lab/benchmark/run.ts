@@ -9,6 +9,7 @@ import {
   runPipelineTurn,
 } from "../../pipeline/atcPipeline";
 import { labAirport, labTower } from "../airports";
+import { labDirectory } from "../directoryFixture";
 import { BenchmarkRun, BenchmarkScenario, StepResult } from "./benchmarkTypes";
 import { evaluateResponse } from "./checks";
 import {
@@ -41,6 +42,7 @@ async function runScenarioOnce(
         DEFAULT_PILOT_PROFILE.pilotId,
         DEFAULT_PILOT_PROFILE.displayName,
       ),
+    { askFlightIntake: scenario.askFlightIntake },
   );
   let nowMs = 0;
 
@@ -89,6 +91,7 @@ async function runScenarioOnce(
           trafficCount: scenario.trafficCount,
           callsign,
           pilotTransmission: step.pilot,
+          directory: () => labDirectory,
         },
         state,
       );

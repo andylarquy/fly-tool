@@ -27,6 +27,7 @@ export interface BenchmarkScenario {
   origin: ScenarioOrigin;
   record?: PilotRecord;
   trafficCount?: number;
+  askFlightIntake?: boolean;
   steps: BenchmarkStep[];
 }
 
