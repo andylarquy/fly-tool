@@ -4,4 +4,10 @@ dist/
 benchmark-results/
 
 # Kept locally in case the previous C# setup needs to be referenced.
-SimConnect.Local.propsdata/
+SimConnect.Local.props
+
+# Pilot records written by JsonPilotRecordStore
+data/
+
+# Raw OurAirports snapshot (large); see datasets/ourairports/README.md
+datasets/ourairports/*.csv
