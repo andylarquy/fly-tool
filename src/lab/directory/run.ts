@@ -109,6 +109,36 @@ function runShortlist(): void {
   check("Lookup by code is exact", fixture.byCode("aep")?.id === "SABE" && fixture.byCode("AEE") === undefined);
 }
 
+function runSharedNames(): void {
+  const santaFe = (id: string, country: string, latitude: number, longitude: number, type: AirportEntry["type"] = "medium") =>
+    entry(id, "Santa Fe Airport", country, latitude, longitude, { type, aliases: ["Santa Fe Airport", "Santa Fe"] });
+
+  const shortlist = (airports: AirportEntry[], near = BUENOS_AIRES) =>
+    new AirportDirectory(airports).shortlist("Santa Fe", { near });
+
+  const lone = shortlist([santaFe("SAAV", "AR", -31.7, -60.8), santaFe("KSAF", "US", 35.6, -106.1)]);
+  check("A same-named airport thousands of miles away is not a rival", lone.confident && lone.candidates[0].airport.id === "SAAV");
+
+  const close = shortlist([santaFe("A", "AR", -31.7, -60.8), santaFe("B", "AR", -31.3, -60.3)]);
+  check("Two same-named airports at similar distance and size are ambiguous", !close.confident);
+
+  const sized = new AirportDirectory([
+    entry("BIG", "Cordoba Airport", "AR", -31.3, -64.2, { type: "large", aliases: ["Cordoba"] }),
+    entry("SMALL", "Cordoba Airstrip", "AR", -31.3, -64.0, { type: "small", aliases: ["Cordoba"] }),
+  ]).shortlist("Cordoba", { near: { latitude: -32.9, longitude: -68.8 } });
+  check("At similar distance the bigger airport wins, not the nearer one", sized.candidates[0].airport.id === "BIG");
+
+  const nearer = new AirportDirectory([
+    entry("NEAR", "Rosario Airfield", "AR", -34.0, -59.0, { type: "medium", aliases: ["Rosario"] }),
+    entry("FAR", "Rosario Airport", "AR", -33.0, -60.7, { type: "medium", aliases: ["Rosario"] }),
+  ]).shortlist("Rosario", { near: BUENOS_AIRES });
+  check("At equal size the nearer airport comes first", nearer.candidates[0].airport.id === "NEAR");
+
+  const without = fixture.shortlist("El Palomar", { near: BUENOS_AIRES, exclude: ["SADP"] });
+  check("An excluded airport (the one the pilot is on) is never offered", without.candidates.every((c) => c.airport.id !== "SADP"));
+  check("Candidates carry their distance", fixture.shortlist("Ezeiza", { near: BUENOS_AIRES }).candidates[0].distanceNauticalMiles !== undefined);
+}
+
 function runLoader(): void {
   const entries = buildEntries(
     '"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code","gps_code","local_code","home_link","wikipedia_link","keywords"\n' +
@@ -153,6 +183,16 @@ function runRealData(): void {
   check("Real data: EZE and SAEZ", best("EZE").candidates[0]?.airport.id === "SAEZ" && best("SAEZ").candidates[0]?.airport.id === "SAEZ");
   check("Real data: a typo", best("Eseiza").candidates[0]?.airport.id === "SAEZ");
   check("Real data: Buenos Aires is ambiguous", !best("Buenos Aires").confident);
+  check("Real data: Santa Fe from Buenos Aires puts the Argentine airport first", best("Santa Fe").candidates[0]?.airport.country === "AR");
+  check(
+    "Real data: Cordoba from Mendoza is the big airport, confidently",
+    directory.shortlist("Cordoba", { near: { latitude: -32.89, longitude: -68.85 } }).candidates[0]?.airport.id === "SACO" &&
+      directory.shortlist("Cordoba", { near: { latitude: -32.89, longitude: -68.85 } }).confident,
+  );
+  check(
+    "Real data: San Fernando from Buenos Aires is confident",
+    best("San Fernando").candidates[0]?.airport.id === "SADF" && best("San Fernando").confident,
+  );
   check(
     "Real data: Aeroparque carries its frequencies",
     directory.byCode("SABE")?.frequencies.some((f) => f.type === "ground" && f.frequencyMhz === 121.9) === true,
@@ -162,6 +202,7 @@ function runRealData(): void {
 runCsv();
 runText();
 runShortlist();
+runSharedNames();
 runLoader();
 runRealData();
 

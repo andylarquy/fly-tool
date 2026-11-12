@@ -263,8 +263,13 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   and weighs airport size and distance from `near` (so "Moron" near Buenos
   Aires is the Argentine one). An ambiguous result is meant to make the
   controller confirm, not guess. Index build is ~0.2 s and shortlist ~50-90 ms
-  over the full set. Aliases such as "Aeroparque" are only as good as the
-  data's keywords; a local alias file is still to come.
+  over the full set. Distance is a strong signal: a same-named airport at least
+  3x and 100 nm farther than the best match is not counted as a rival (nobody
+  means Santa Fe, New Mexico from Buenos Aires), but at similar distances the
+  bigger airport wins and a close call stays ambiguous. `exclude` lets the
+  caller leave out the airport the pilot is on. Aliases such as "Aeroparque"
+  are only as good as the data's keywords; a local alias file is still to
+  come.
 - `src/utils/csv.ts` — RFC 4180 parser (quoted commas, doubled quotes, line
   breaks); an empty number field must not become 0.
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.

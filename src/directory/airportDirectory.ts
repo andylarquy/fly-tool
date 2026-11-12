@@ -7,12 +7,14 @@ export interface AirportCandidate {
   airport: AirportEntry;
   score: number;
   matchedOn: string;
+  distanceNauticalMiles?: number;
 }
 
 export interface ShortlistOptions {
   near?: GeoPoint;
   limit?: number;
   countries?: string[];
+  exclude?: string[];
 }
 
 export interface Shortlist {
@@ -35,6 +37,12 @@ const CONFIDENT_SCORE = 0.8;
 const CONFIDENT_MARGIN = 0.15;
 const MINIMUM_SCORE = 0.5;
 const DEFAULT_LIMIT = 5;
+
+// A same-named airport this much farther away than the best match, and by at
+// least this many miles, is not a serious rival: nobody means Santa Fe, New
+// Mexico from Buenos Aires.
+const FAR_RIVAL_RATIO = 3;
+const FAR_RIVAL_EXTRA_NM = 100;
 
 interface IndexedAirport {
   airport: AirportEntry;
@@ -65,6 +73,12 @@ const nameScore = (queryTokens: string[], nameTokens: string[]): number => {
 
   return similarity * (0.75 + 0.25 * coverage);
 };
+
+const isFarRival = (best: AirportCandidate, rival: AirportCandidate): boolean =>
+  best.distanceNauticalMiles !== undefined &&
+  rival.distanceNauticalMiles !== undefined &&
+  rival.distanceNauticalMiles >= best.distanceNauticalMiles * FAR_RIVAL_RATIO &&
+  rival.distanceNauticalMiles - best.distanceNauticalMiles >= FAR_RIVAL_EXTRA_NM;
 
 export class AirportDirectory {
   private readonly indexed: IndexedAirport[];
@@ -103,7 +117,10 @@ export class AirportDirectory {
     const candidates: AirportCandidate[] = [];
 
     for (const entry of this.indexed) {
-      if (options.countries && !options.countries.includes(entry.airport.country)) {
+      if (
+        (options.countries && !options.countries.includes(entry.airport.country)) ||
+        options.exclude?.includes(entry.airport.id)
+      ) {
         continue;
       }
 
@@ -128,25 +145,29 @@ export class AirportDirectory {
         continue;
       }
 
-      const proximity = options.near
-        ? 1 / (1 + distanceNauticalMiles(options.near, entry.airport.position) / PROXIMITY_SCALE_NM)
-        : 0;
+      const distance = options.near
+        ? distanceNauticalMiles(options.near, entry.airport.position)
+        : undefined;
+      const proximity = distance === undefined ? 0 : 1 / (1 + distance / PROXIMITY_SCALE_NM);
 
       candidates.push({
         airport: entry.airport,
         score: score * TYPE_WEIGHT[entry.airport.type] * (1 + PROXIMITY_BONUS * proximity),
         matchedOn,
+        ...(distance === undefined ? {} : { distanceNauticalMiles: distance }),
       });
     }
 
     candidates.sort((a, b) => b.score - a.score);
     const top = candidates.slice(0, limit);
 
-    const [first, second] = top;
+    const [first, ...rivals] = top;
     const confident =
       first !== undefined &&
       first.score >= CONFIDENT_SCORE &&
-      (second === undefined || first.score - second.score >= CONFIDENT_MARGIN);
+      rivals
+        .filter((rival) => !isFarRival(first, rival))
+        .every((rival) => first.score - rival.score >= CONFIDENT_MARGIN);
 
     return { candidates: top, confident };
   }
