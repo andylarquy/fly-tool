@@ -137,4 +137,28 @@ export const readbackSamples: ReadbackSample[] = [
     transcript: "Taxi to runway 05 via Charlie, Alpha, Bravo, hold short runway 05, LV-INQ.",
     taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
   },
+  {
+    transcript: "taxi to hold short of runnway 23 via Charlie, Alpha, Bravo, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "taxi to hold shrt of runway 23 via Charli, Alpha, Brabo, LV-INQ.",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "taxi to runway twenty three via charlie alpha bravo hold short runway twenty three lv inq",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "TAXI TO RUNWAY 23 VIA CHARLIE ALPHA BRAVO HOLD SHORT RUNWAY 23",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
+  {
+    transcript: "taxi to runway 21 via charlie alpha bravo hold short runnway 21",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB, false, true),
+  },
+  {
+    transcript: "taxi to runway 2 3 via charlie, alpha, bravo, hold short runway 2 3, LV-INQ",
+    taxiways: CAB, holdShort: "23", expected: verdict(true, true, CAB),
+  },
 ];

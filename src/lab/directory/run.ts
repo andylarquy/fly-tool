@@ -7,6 +7,7 @@ import {
   loadOurAirports,
 } from "../../directory/ourAirports";
 import { editDistance, normalize, significantTokens, tokenSimilarity } from "../../directory/textMatch";
+import { isQuoted } from "../../ai/interpreter/modelOutputParsing";
 import { parseCsv } from "../../utils/csv";
 
 const failures: string[] = [];
@@ -77,12 +78,32 @@ function runCsv(): void {
   check("CRLF line endings are handled", rows.length === 2);
 }
 
+function runQuotes(): void {
+  const said = "taxi to hold short of runnway 23 via Charli, Alpha, Brabo, LV-INQ";
+
+  check("A quote that is in the transcript counts", isQuoted(said, "hold short of runnway 23"));
+  check("Case and punctuation do not matter", isQuoted(said, "VIA CHARLI ALPHA BRABO"));
+  check("A typo the model repaired when quoting still counts", isQuoted(said, "hold short of runway 23"));
+  check("A typo in the transcript and the right spelling in the quote both count", isQuoted(said, "via Charlie, Alpha, Bravo"));
+  check("A number must match exactly", !isQuoted(said, "hold short of runway 21"));
+  check("A word the pilot never said does not count", !isQuoted(said, "hold short of the runway 23"));
+  check("The words must come in the order spoken", !isQuoted(said, "23 runway hold short"));
+  check("Words that are only near each other, not adjacent, do not count", !isQuoted(said, "taxi runway"));
+  check("An empty or missing quote does not count", !isQuoted(said, "") && !isQuoted(said, undefined) && !isQuoted(said, 5));
+  check("A quote longer than the transcript does not count", !isQuoted("hold short", "hold short runway 23"));
+  check("A completely different word does not count", !isQuoted(said, "hold long"));
+  check("It works in another language", isQuoted("rodaje por charlie mantengo antes de la pista 23", "mantengo antes de la pista 23"));
+  check("And in another script", isQuoted("посадка на полосу 23", "на полосу 23"));
+}
+
 function runText(): void {
   check("Accents and case are ignored", normalize("Morón AIRPORT") === "moron airport");
   check("Generic words are dropped", significantTokens("Aeropuerto Internacional de Ezeiza").join() === "ezeiza");
   check("A name made only of generic words keeps its words", significantTokens("Airport").join() === "airport");
   check("A one-letter slip still matches a long word", tokenSimilarity("eseiza", "ezeiza") > 0.8);
   check("Short words must match exactly", tokenSimilarity("eze", "ese") === 0);
+  check("Two swapped neighboring letters are one edit", editDistance("rosaroi", "rosario", 1) === 1);
+  check("A swap is one edit even in a short word", editDistance("teh", "the", 1) === 1);
   check("Edit distance gives up past its limit", editDistance("abcdefgh", "zzzzzzzz", 2) === 3);
 }
 
@@ -254,6 +275,7 @@ function runRealData(): void {
 
 runCsv();
 runText();
+runQuotes();
 runShortlist();
 runSpokenNames();
 runSharedNames();

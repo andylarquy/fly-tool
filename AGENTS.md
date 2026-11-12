@@ -362,6 +362,9 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   without "airport"/"international"; for a long official name its town only if
   the data also lists the town as a name for it (Córdoba), otherwise the full
   name (Carrasco is in Ciudad de la Costa, which nobody calls it).
+- `src/utils/text.ts` — `normalize` (case, accents and punctuation, any script),
+  `editDistance` (a neighbor swap is one edit) and `tokenSimilarity` (typo
+  tolerance by word length), shared by the airport lookup and `isQuoted`.
 - `src/utils/csv.ts` — RFC 4180 parser (quoted commas, doubled quotes, line
   breaks); an empty number field must not become 0.
 - `src/utils/geo.ts` — flat-earth runway-frame math used by the above.
@@ -439,7 +442,18 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       front of the name are dropped on a retry). It runs only while the plan is
       incomplete.
     - `modelOutputParsing.ts` — small shared helpers for validating model
-      output.
+      output. `isQuoted` checks that a quote the model gives really is in what
+      the pilot said, *tolerating the slips speech and typing make*: the words
+      are matched one by one in order, each allowed a small typo (long words
+      one or two letters off, a swap of neighboring letters counts as one,
+      short words and numbers must be exact). The model repairs typos when it
+      quotes ("runnway" comes back "runway"), and an exact substring test
+      rejected correct quotes. No vocabulary: it works in any language and
+      script. Used for the runway and hold-short quotes, the destination, and
+      the taxiway mentions.
+      The labeled sample files under `src/lab/` (`readbackSamples.ts`,
+      `samples.ts`, `intakeSamples.ts`) are *test data only*: they measure the
+      model, are never sent to it and never consulted by the app.
   - `renderer/` — `AtcIntent[]` -> the controller's words (ATC side).
     - `intentRenderer.ts` / `intentRendererPrompt.ts` / `describeIntent.ts` —
       turns intents into one transmission using a small phrasebook prompt.

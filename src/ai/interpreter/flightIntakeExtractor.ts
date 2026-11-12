@@ -1,5 +1,6 @@
 import ollama from "ollama";
 import { MODEL, THINKING } from "../modelConfig";
+import { isQuoted } from "./modelOutputParsing";
 import {
   buildFlightIntakeSchema,
   FLIGHT_INTAKE_SYSTEM_PROMPT,
@@ -13,8 +14,6 @@ export interface FlightIntakeWords {
   local: boolean;
   choice?: number;
 }
-
-const squash = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 
 // "Sierra Alpha Echo Zulu" for SAEZ: consecutive words whose first letters
 // spell the code.
@@ -36,7 +35,7 @@ const isSpelledOut = (code: string, transcript: string): boolean => {
 const isGrounded = (said: string, transcript: string): boolean =>
   said !== "" &&
   said.toLowerCase() !== NOT_STATED &&
-  (squash(transcript).includes(squash(said)) || isSpelledOut(said, transcript));
+  (isQuoted(transcript, said) || isSpelledOut(said, transcript));
 
 const withoutCallsign = (text: string, callsign?: string): string => {
   if (!callsign) {

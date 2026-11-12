@@ -48,4 +48,6 @@ export const intakeSamples: IntakeSample[] = [
   { transcript: "El segundo, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], choice: 2 },
   { transcript: "Hillside, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], destination: "Hillside" },
   { transcript: "VFR, LV-INQ.", lastAtc: "LV-INQ, confirm destination, Rivera Norte or Rivera Sur.", options: ["Rivera Norte", "Rivera Sur"], rules: "VFR" },
+  { transcript: "VFR to Brariloche, LV-INQ.", destination: "Bariloche", rules: "VFR" },
+  { transcript: "heading to el palomr via vfr lv inq", destination: "El Palomar", rules: "VFR" },
 ];

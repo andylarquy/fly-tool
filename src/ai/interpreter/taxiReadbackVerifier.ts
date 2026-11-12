@@ -22,15 +22,10 @@ export interface TaxiReadbackInput {
 
 // A mention that is really the destination or a runway, which the engine knows
 // from its own data, is not a wrong taxiway.
-const namesKnownNonTaxiway = (said: string, known: string[]): boolean => {
-  const spoken = said.trim().toLowerCase();
-
-  return known.some((text) => {
-    const data = text.trim().toLowerCase();
-
-    return data.length > 0 && (spoken.includes(data) || data.includes(spoken));
-  });
-};
+const namesKnownNonTaxiway = (said: string, known: string[]): boolean =>
+  known.some(
+    (text) => text.trim().length > 0 && (isQuoted(text, said) || isQuoted(said, text)),
+  );
 
 const designator = (text: string): string | undefined => {
   const match = /^\s*0*(\d{1,2})\s*([LRClrc]?)\s*$/.exec(text);

@@ -1,4 +1,5 @@
 import { extractEmergencyDetails } from "../../ai/interpreter/emergencyDetailsExtractor";
+import { isQuoted } from "../../ai/interpreter/modelOutputParsing";
 import { extractFlightIntake } from "../../ai/interpreter/flightIntakeExtractor";
 import { verifyTaxiReadback } from "../../ai/interpreter/taxiReadbackVerifier";
 import { classifyPilotMessage } from "../../ai/interpreter/pilotMessageClassifier";
@@ -229,6 +230,10 @@ async function runIntakeExtraction(): Promise<void> {
       // the model repeats alongside it is not compared.
       sample.choice !== undefined ||
       squash(got.destinationText) === squash(sample.destination) ||
+      // A typo in what the pilot said, or the model's repair of it, is the same place.
+      (sample.destination !== undefined &&
+        got.destinationText !== undefined &&
+        (isQuoted(sample.destination, got.destinationText) || isQuoted(got.destinationText, sample.destination))) ||
       (sample.destination !== undefined && squash(got.destinationText) === initials(sample.destination));
 
     const correct = {
