@@ -219,6 +219,40 @@ async function runSessionChecks(): Promise<void> {
     await sleep(20);
     check("A stopped session starts nothing new", log.filter((l) => l.startsWith("start")).length === 1);
   }
+  {
+    const seen: string[] = [];
+    const records: PilotRecord[] = [];
+    const visitStarted: boolean[] = [];
+    const turn = (async (input: PipelineInput, previous: PipelineState): Promise<PipelineTurn> => {
+      seen.push(`${input.airport.icao}/${input.facility.id}/${input.callsign}/${previous.engine.runway}`);
+      records.push(previous.record);
+      visitStarted.push(previous.visitStarted);
+      await sleep(20);
+
+      return { transmission: "x", state: { ...previous, visitStarted: true }, trace: {} as PipelineTurn["trace"] };
+    }) as typeof runPipelineTurn;
+    const { session, simulator, saved } = newSession(turn, { callsign: "OLD1" });
+    const elsewhere = { ...labAirport, icao: "ELSE", runways: [{ ...labAirport.runways[0], designator: "09" }] };
+
+    session.start();
+    simulator.advance(1);
+    await session.say("one");
+    const moved = session.relocate({
+      airport: elsewhere,
+      facility: { ...labTower, id: "ELSE-TWR", airportIcao: "ELSE" },
+      runway: "09",
+      callsign: "NEW2",
+    });
+    session.tick();
+    await moved;
+    await session.say("two");
+
+    check("A session moved to another airport uses it from the next turn on", seen[1] === "ELSE/ELSE-TWR/NEW2/09", seen.join(" | "));
+    check("The first turn used the original airport", seen[0] === `${labAirport.icao}/${labTower.id}/OLD1/${labAirport.runways[0].designator}`, seen[0]);
+    check("Moving keeps the pilot record, starts the visit over and saves", records[1] === records[0] && !visitStarted[1] && saved.length === 1, `${saved.length} saves`);
+    check("A tick during the move is dropped", seen.length === 2, seen.join(" | "));
+  }
+
 }
 
 runSessionChecks().then(() => {

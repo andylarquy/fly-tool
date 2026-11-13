@@ -125,17 +125,32 @@ doesn't have real situational grounding yet.
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
   a temp directory. Exits non-zero on any failure.
 - `npm run live` — build + run `src/live.ts`. The pipeline against the real
-  MSFS 2024: connects, takes the airport nearest the aircraft (or
-  `--airport <ICAO>`) from the sim's own facility data (`MsfsFacilityReader`),
-  guesses the active runway from the aircraft's heading (`--runway` overrides),
-  and runs `FlightSession` with stdin as the pilot's radio. Same flags as
-  `lab:play` where they apply (`--callsign`, `--intake`, `--records`); `/where`,
-  `/quit`. Needs MSFS and Ollama. Fixed at start: it does not switch airports
-  if you fly away, and the callsign is still the placeholder (`ATC ID` not read).
+  MSFS 2024: waits for the sim to start (retrying every 5 s), reads the airports
+  from the sim's own facility data (`MsfsFacilityReader`) and runs
+  `FlightSession` with stdin as the pilot's radio. The callsign is the aircraft's
+  tail number (`ATC ID`; `--callsign` overrides), the engine clock is the sim's
+  own time (`ABSOLUTE TIME`, `app/simClock.ts`: a pause stops it, a faster sim
+  rate speeds it up). `app/airportTracker.ts` picks the airport (the nearest one
+  with a runway, not heliports) and switches when the aircraft has clearly left
+  it (>8 nm and 2 nm nearer to another; a neighbor under 2 nm on the ground; in
+  the air only within 30 nm), and a jump (a teleport, or sim time going backwards
+  on a flight reload) starts the session over via `FlightSession.relocate`,
+  which keeps the pilot record and drops the controller's memory of the flight.
+  The active runway is the end the aircraft points along (`--runway` overrides;
+  no wind data yet). If the sim quits, the record is saved and the app exits.
+  `--airport <ICAO>` pins the airport (no switching); `--intake`, `--records`
+  as in `lab:play`; `--trace <file>` writes one JSON line per second (phase,
+  speed, runway-relative position, intents) for diagnosing timing. `/where`
+  shows the nearest parking and, while taxiing, the distance to go; `/quit`.
+  Needs MSFS and Ollama.
 - `npm run lab:probe` — build + run `src/lab/probe/run.js`. Prints live
   telemetry once a second; `-- --airport` reads the nearest airport's facility
   data and prints what was built from it (add `--segments` for the taxi graph in
   runway coordinates). The tool for checking the sim-side assumptions.
+- `npm run lab:tracker` — build + run `src/lab/tracker/run.js`. Deterministic:
+  the airport tracker's switching rules on a fake airport list, jump detection,
+  active-runway guess and the sim clock. (`FlightSession.relocate` is tested in
+  `lab:sim`.)
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -567,6 +582,8 @@ uncontrolled field with no taxiway names) with `lab:probe` and `npm run live`:
   runway-type `TAXI_PATH` is 2 (the paths run along the runway, so a route that
   uses them reads as "cross runway"), the facility field layouts (no bytes left
   over), the first end-to-end turn (lined up -> takeoff clearance).
+- `ATC ID` returns the tail number (F-BOHZ) and `ABSOLUTE TIME` advances one
+  second per second at 1x.
 - Also at SABE (Aeroparque; 433 taxi points, taxiways A-M, 58 parking spots):
   `TAXI_NAME`/`NAME_INDEX` give real taxiway names, parking enum 1 = "Parking"
   and 10 = "Gate", frequency type codes 1 atis / 5 ground / 6 tower / 7 clearance
@@ -576,6 +593,10 @@ uncontrolled field with no taxiway names) with `lab:probe` and `npm run live`:
 - Runway designators are the sim's: SADI says 22/04 at a true heading of 195.
 
 ## Still unverified against a real simulator
+
+- Live airport switching, the jump reset, the pause/sim-rate clock and the
+  sim-quit exit are covered by deterministic labs only; none has been seen in
+  the sim yet (a teleport, a pause, a faster sim rate, quitting MSFS).
 
 These assumptions are built in and need checking on a sim machine (a wrong one
 fails quietly, not loudly). Most need a larger airport than SADI (named
@@ -594,7 +615,7 @@ taxiways, a tower and ground frequency):
   as CTAF (a known navdata problem). With either missing the engine falls back
   to one controller. Approach/departure/center/ATIS frequencies are decoded but
   not used yet.
-- `ATC ID` returning the user aircraft's tail number; AI traffic fields;
+- AI traffic fields;
   `PLANE TOUCHDOWN NORMAL VELOCITY`; wind and pressure SimVars.
 
 ## Conventions worth preserving

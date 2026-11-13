@@ -9,4 +9,6 @@ export interface AircraftState {
   verticalSpeedFeetPerMinute: number;
   isOnGround: boolean;
   com1FrequencyMhz?: number;
+  tailNumber?: string;
+  simTimeSeconds?: number;
 }

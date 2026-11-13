@@ -23,6 +23,7 @@
     "lab:taxi": "npm run build && node dist/lab/taxi/run.js",
     "lab:memory": "npm run build && node dist/lab/memory/run.js",
     "lab:probe": "npm run build && node dist/lab/probe/run.js",
+    "lab:tracker": "npm run build && node dist/lab/tracker/run.js",
     "lab:renderer": "npm run build && node dist/lab/renderer/run.js"
   },
   "dependencies": {

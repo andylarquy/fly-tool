@@ -41,13 +41,38 @@ export class FlightSession {
   private tail: Promise<unknown> = Promise.resolve();
   private inFlight = 0;
   private stopped = false;
+  private airport: Airport;
+  private facility: Facility;
+  private callsign?: string;
 
   constructor(private readonly options: FlightSessionOptions) {
+    this.airport = options.airport;
+    this.facility = options.facility;
+    this.callsign = options.callsign;
     this.pipeline = createPipelineState(
       options.runway ?? options.airport.runways[0].designator,
       options.record,
       { askFlightIntake: options.askFlightIntake },
     );
+  }
+
+  // Moves the session to another airport (or starts it over at the same one):
+  // the controller's memory of this flight is dropped, the pilot's record is
+  // kept and saved. It waits for any turn in flight, and ticks meanwhile are
+  // dropped like they are during a turn.
+  relocate(target: { airport: Airport; facility: Facility; runway?: string; callsign?: string }): Promise<void> {
+    return this.queue(async () => {
+      await this.options.store?.save(this.pipeline.record);
+
+      this.airport = target.airport;
+      this.facility = target.facility;
+      this.callsign = target.callsign ?? this.callsign;
+      this.pipeline = createPipelineState(
+        target.runway ?? target.airport.runways[0].designator,
+        this.pipeline.record,
+        { askFlightIntake: this.options.askFlightIntake },
+      );
+    });
   }
 
   get state(): PipelineState {
@@ -93,13 +118,15 @@ export class FlightSession {
   }
 
   private enqueue(transmission: string | undefined): Promise<PipelineTurn | undefined> {
+    return this.queue(() => this.execute(transmission));
+  }
+
+  private queue<T>(work: () => Promise<T>): Promise<T> {
     this.inFlight++;
 
-    const turn = this.tail
-      .then(() => this.execute(transmission))
-      .finally(() => {
-        this.inFlight--;
-      });
+    const turn = this.tail.then(work).finally(() => {
+      this.inFlight--;
+    });
 
     this.tail = turn.catch(() => undefined);
 
@@ -119,11 +146,11 @@ export class FlightSession {
       const turn = await (options.runTurn ?? runPipelineTurn)(
         {
           aircraft,
-          airport: options.airport,
+          airport: this.airport,
           observedAtMs: nowMs,
-          facility: options.facility,
+          facility: this.facility,
           epochMs: options.epochBaseMs + nowMs,
-          callsign: options.callsign,
+          callsign: this.callsign,
           style: options.style,
           pilotTransmission: transmission,
           directory: options.directory,

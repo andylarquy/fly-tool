@@ -6,6 +6,7 @@ import {
 } from "node-simconnect";
 import { Airport } from "../../domain/Airport";
 import { GeoPoint } from "../../domain/GeoPoint";
+import { ListedAirport } from "../../domain/ListedAirport";
 import { distanceFeet, FEET_PER_METER } from "../../utils/geo";
 import { parkingNameFromCode, parkingSuffixFromCode } from "./parkingNames";
 import { buildFrequencies, RawFrequency } from "./frequencyFacility";
@@ -17,12 +18,6 @@ import {
   RawTaxiPath,
   RawTaxiPoint,
 } from "./taxiFacility";
-
-export interface ListedAirport {
-  icao: string;
-  region: string;
-  position: GeoPoint;
-}
 
 const DEFINITION_ID = 1000;
 const FIRST_REQUEST_ID = 2000;

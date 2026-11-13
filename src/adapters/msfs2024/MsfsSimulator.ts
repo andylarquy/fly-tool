@@ -14,6 +14,8 @@ const AIRCRAFT_STATE_REQUEST_ID = 0;
 export class MsfsSimulator implements SimulatorAdapter {
   private handle: Awaited<ReturnType<typeof open>>["handle"] | null = null;
   private readonly subscribers: ((state: AircraftState) => void)[] = [];
+  private readonly disconnectListeners: (() => void)[] = [];
+  private closing = false;
 
   async connect(): Promise<void> {
     if (this.handle) {
@@ -23,8 +25,31 @@ export class MsfsSimulator implements SimulatorAdapter {
     const { handle } = await open("Fly Tool Telemetry", Protocol.SunRise);
 
     this.handle = handle;
+    this.closing = false;
+
+    // The simulator quitting, or the connection dropping for any other reason,
+    // ends the session; a disconnect we asked for does not report itself.
+    const lost = (): void => {
+      if (this.handle !== handle) {
+        return;
+      }
+
+      this.handle = null;
+
+      if (!this.closing) {
+        this.disconnectListeners.forEach((listener) => listener());
+      }
+    };
+
+    handle.on("quit", lost);
+    handle.on("close", lost);
+    handle.on("error", lost);
 
     this.setupAircraftStateDefinition();
+  }
+
+  onDisconnect(callback: () => void): void {
+    this.disconnectListeners.push(callback);
   }
 
   disconnect(): void {
@@ -32,6 +57,7 @@ export class MsfsSimulator implements SimulatorAdapter {
       return;
     }
 
+    this.closing = true;
     this.handle.close();
     this.handle = null;
   }
@@ -65,6 +91,8 @@ export class MsfsSimulator implements SimulatorAdapter {
         verticalSpeedFeetPerMinute: data.readFloat64(),
         isOnGround: data.readInt32() !== 0,
         com1FrequencyMhz: data.readFloat64(),
+        tailNumber: data.readString32().trim(),
+        simTimeSeconds: data.readFloat64(),
       };
 
       for (const subscriber of this.subscribers) {
@@ -150,6 +178,20 @@ export class MsfsSimulator implements SimulatorAdapter {
       AIRCRAFT_STATE_DEFINITION_ID,
       "COM ACTIVE FREQUENCY:1",
       "MHz",
+      SimConnectDataType.FLOAT64,
+    );
+
+    handle.addToDataDefinition(
+      AIRCRAFT_STATE_DEFINITION_ID,
+      "ATC ID",
+      null,
+      SimConnectDataType.STRING32,
+    );
+
+    handle.addToDataDefinition(
+      AIRCRAFT_STATE_DEFINITION_ID,
+      "ABSOLUTE TIME",
+      "seconds",
       SimConnectDataType.FLOAT64,
     );
   }

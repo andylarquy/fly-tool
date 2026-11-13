@@ -2,21 +2,25 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import * as readline from "node:readline";
 import { MsfsFacilityReader } from "./adapters/msfs2024/MsfsFacilityReader";
 import { MsfsSimulator } from "./adapters/msfs2024/MsfsSimulator";
+import { AirportTracker, facilityFor, isJump, likelyActiveRunway } from "./app/airportTracker";
 import { FlightSession } from "./app/flightSession";
+import { SimClock } from "./app/simClock";
 import { AirportDirectory } from "./directory/airportDirectory";
 import { directoryFilesExist, loadOurAirports } from "./directory/ourAirports";
 import { AircraftState } from "./domain/AircraftState";
-import { Airport, Runway } from "./domain/Airport";
+import { Airport } from "./domain/Airport";
 import { DEFAULT_FLIGHT_PLAN } from "./domain/defaultFlightPlan";
 import { DEFAULT_PILOT_PROFILE } from "./domain/defaultPilot";
-import { Facility } from "./domain/Facility";
 import { JsonPilotRecordStore } from "./memory/jsonPilotRecordStore";
 import { createPilotRecord } from "./memory/recordKeeping";
 import { PipelineTurn } from "./pipeline/atcPipeline";
-import { nearestParking, distanceToPointFeet } from "./taxi/routing";
-import { angleDifferenceDegrees, distanceFeet } from "./utils/geo";
+import { distanceToPointFeet, nearestParking } from "./taxi/routing";
+import { distanceFeet } from "./utils/geo";
 
 const TICK_MS = 1000;
+const RECONNECT_MS = 5000;
+const AIRPORT_CHECK_MS = 5000;
+const NO_TELEMETRY_NOTICE_MS = 5000;
 
 const stringAfter = (name: string): string | undefined => {
   const index = process.argv.indexOf(name);
@@ -26,70 +30,118 @@ const stringAfter = (name: string): string | undefined => {
 
 const flag = (name: string): boolean => process.argv.includes(name);
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 const HELP = `
-Radio: type what you would say, e.g.  Ground, LV-INQ, request taxi for departure.
+Radio: type what you would say, e.g.  Ground, <callsign>, request taxi for departure.
 Commands: /where (what the controller thinks), /quit (save the pilot record and leave).
-Options: --airport <ICAO>, --runway <designator>, --callsign <x>, --intake, --records <dir>,
+Options: --airport <ICAO> (stay at that airport), --runway <designator>, --callsign <x>
+         (default: the aircraft's tail number), --intake, --records <dir>,
          --trace <file> (one JSON line per second: phase, speed, runway-relative position, intents).
 `;
 
+const connectWhenAvailable = async (simulator: MsfsSimulator): Promise<void> => {
+  let announced = false;
+
+  for (;;) {
+    try {
+      await simulator.connect();
+
+      return;
+    } catch {
+      if (!announced) {
+        console.log("Waiting for Microsoft Flight Simulator 2024 to start (Ctrl+C to quit)...");
+        announced = true;
+      }
+
+      await sleep(RECONNECT_MS);
+    }
+  }
+};
+
 const waitForTelemetry = (simulator: MsfsSimulator): Promise<AircraftState> =>
   new Promise((resolve) => {
-    simulator.onAircraftStateUpdate((state) => resolve(state));
+    const notice = setTimeout(
+      () => console.log("Connected, waiting for a flight to load..."),
+      NO_TELEMETRY_NOTICE_MS,
+    );
+
+    simulator.onAircraftStateUpdate((state) => {
+      clearTimeout(notice);
+      resolve(state);
+    });
   });
-
-// Without wind data, the end the aircraft already points along is the best guess
-// at the runway in use; from the ramp the first one is as good as any.
-const likelyActiveRunway = (airport: Airport, aircraft: AircraftState): Runway =>
-  airport.runways.reduce((best, runway) =>
-    Math.abs(angleDifferenceDegrees(aircraft.trueHeading, runway.trueHeading)) <
-    Math.abs(angleDifferenceDegrees(aircraft.trueHeading, best.trueHeading))
-      ? runway
-      : best,
-  );
-
-const facilityFor = (airport: Airport): Facility => ({
-  id: `${airport.icao}-TWR`,
-  airportIcao: airport.icao,
-  role: "tower",
-  frequencyMhz: airport.frequencies?.find((f) => f.type === "tower")?.frequencyMhz ?? 0,
-});
 
 async function main(): Promise<void> {
   const simulator = new MsfsSimulator();
 
   console.log("Connecting to Microsoft Flight Simulator 2024...");
-  await simulator.connect();
+  await connectWhenAvailable(simulator);
 
   const aircraft = await waitForTelemetry(simulator);
   const reader = new MsfsFacilityReader(simulator.getHandle());
-  const forced = stringAfter("--airport");
-  const listed = forced
-    ? { icao: forced.toUpperCase(), region: undefined }
-    : await reader.nearestAirport(aircraft);
-  const { airport, warnings } = await reader.readAirport(listed.icao, listed.region || undefined);
+  const forcedAirport = stringAfter("--airport")?.toUpperCase();
+  const forcedRunway = stringAfter("--runway");
+  const forcedCallsign = stringAfter("--callsign");
+  const callsignFor = (state: AircraftState): string =>
+    forcedCallsign || state.tailNumber || DEFAULT_FLIGHT_PLAN.callsign || "UNKNOWN";
 
-  warnings.forEach((warning) => console.warn(`! ${warning}`));
+  const tracker = new AirportTracker({
+    list: () => reader.listAirports(),
+    read: async (icao, region) => {
+      const { airport: read, warnings } = await reader.readAirport(icao, region);
 
-  const runway =
-    airport.runways.find((r) => r.designator === stringAfter("--runway")) ??
-    likelyActiveRunway(airport, aircraft);
-  const callsign = stringAfter("--callsign") ?? DEFAULT_FLIGHT_PLAN.callsign;
+      warnings.forEach((warning) => console.warn(`! ${icao}: ${warning}`));
+
+      return read;
+    },
+  });
+
+  let airport: Airport;
+
+  if (forcedAirport) {
+    const { airport: read, warnings } = await reader.readAirport(forcedAirport);
+
+    warnings.forEach((warning) => console.warn(`! ${warning}`));
+    airport = read;
+  } else {
+    const nearest = await tracker.nearest(aircraft);
+
+    if (!nearest) {
+      throw new Error("No airport with a runway was found near the aircraft.");
+    }
+
+    airport = nearest;
+  }
+
+  const activeRunwayFor = (target: Airport, state: AircraftState): string =>
+    (target.runways.find((r) => r.designator === forcedRunway) ?? likelyActiveRunway(target, state)).designator;
+
   const store = new JsonPilotRecordStore(stringAfter("--records"));
   const record =
     (await store.load(DEFAULT_PILOT_PROFILE.pilotId)) ??
     createPilotRecord(DEFAULT_PILOT_PROFILE.pilotId, DEFAULT_PILOT_PROFILE.displayName);
 
-  let latest: AircraftState | undefined = aircraft;
+  const clock = new SimClock();
+  const startedAt = Date.now();
+  let latest: AircraftState = aircraft;
+  let pendingReset = false;
+
+  clock.observe(aircraft, Date.now());
   simulator.onAircraftStateUpdate((state) => {
+    if (isJump(latest, state)) {
+      pendingReset = true;
+    }
+
+    clock.observe(state, Date.now());
     latest = state;
   });
+
   let directory: AirportDirectory | undefined;
-  const startedAt = Date.now();
   let closed = false;
 
-  const clock = (): string => {
-    const total = Math.floor((Date.now() - startedAt) / 1000);
+  const stamp = (): string => {
+    const total = Math.floor(clock.now() / 1000);
 
     return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   };
@@ -115,15 +167,27 @@ async function main(): Promise<void> {
     return `  [${situation.phase}] heard ${heard} -> ${intents.map((i) => i.type).join(", ") || "silence"}`;
   };
 
+  const summarize = (target: Airport, runway: string, callsign: string): string => {
+    const tower = target.frequencies?.find((f) => f.type === "tower");
+    const ground = target.frequencies?.find((f) => f.type === "ground");
+
+    return (
+      `${target.name} (${target.icao}), runway ${runway} active, callsign ${callsign}.\n` +
+      `Runways: ${target.runways.map((r) => r.designator).join(", ")}. ` +
+      `Taxi network: ${target.taxi ? `${target.taxi.points.length} points` : "none"}. ` +
+      `Frequencies: ${tower ? `tower ${tower.frequencyMhz}` : "no tower"}${ground ? `, ground ${ground.frequencyMhz}` : ""}.`
+    );
+  };
+
   const session = new FlightSession({
     simulator,
     airport,
     facility: facilityFor(airport),
     record,
     store,
-    callsign,
-    runway: runway.designator,
-    clock: () => Date.now() - startedAt,
+    callsign: callsignFor(aircraft),
+    runway: activeRunwayFor(airport, aircraft),
+    clock: () => clock.now(),
     epochBaseMs: startedAt,
     directory: () => {
       if (!directoryFilesExist()) {
@@ -136,7 +200,7 @@ async function main(): Promise<void> {
     },
     askFlightIntake: flag("--intake"),
     onTransmission: (text, turn, pilotSpoke) =>
-      show(`[${clock()}] ATC> ${text}${pilotSpoke ? "" : "  (unprompted)"}\n${describe(turn)}`),
+      show(`[${stamp()}] ATC> ${text}${pilotSpoke ? "" : "  (unprompted)"}\n${describe(turn)}`),
     onTurn: (turn, pilotSpoke, state) => {
       if (!tracePath) {
         return;
@@ -147,7 +211,7 @@ async function main(): Promise<void> {
       appendFileSync(
         tracePath,
         `${JSON.stringify({
-          t: clock(),
+          t: stamp(),
           phase: situation.phase,
           pending: situation.pendingPhase?.phase,
           groundSpeed: Math.round(state.groundSpeed * 10) / 10,
@@ -165,8 +229,48 @@ async function main(): Promise<void> {
   });
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "Pilot> " });
-  const timer = setInterval(() => session.tick(), TICK_MS);
   let stopping = false;
+  let checking = false;
+
+  // Moves to a new airport, or starts over at the same one after a jump (a
+  // teleport or a flight reload): the controller's memory of the old situation
+  // would otherwise carry over to a place where it means nothing.
+  const reevaluate = async (): Promise<void> => {
+    if (checking || stopping) {
+      return;
+    }
+
+    checking = true;
+
+    try {
+      const resetting = pendingReset;
+      let target: Airport | undefined;
+
+      if (resetting) {
+        pendingReset = false;
+        target = (forcedAirport ? undefined : await tracker.nearest(latest)) ?? airport;
+      } else if (!forcedAirport) {
+        target = await tracker.next(latest, airport);
+      }
+
+      if (target) {
+        const state = latest;
+        const runway = activeRunwayFor(target, state);
+        const callsign = callsignFor(state);
+
+        await session.relocate({ airport: target, facility: facilityFor(target), runway, callsign });
+        airport = target;
+        show(`${resetting ? "Position jumped, starting over at" : "Now at"} ${summarize(target, runway, callsign)}`);
+      }
+    } catch (error) {
+      show(`! ${(error as Error).message}`);
+    } finally {
+      checking = false;
+    }
+  };
+
+  const timer = setInterval(() => session.tick(), TICK_MS);
+  const airportTimer = setInterval(() => void reevaluate(), AIRPORT_CHECK_MS);
 
   const stop = async (): Promise<void> => {
     if (stopping) {
@@ -175,6 +279,7 @@ async function main(): Promise<void> {
 
     stopping = true;
     clearInterval(timer);
+    clearInterval(airportTimer);
     await session.stop();
     simulator.disconnect();
 
@@ -184,6 +289,11 @@ async function main(): Promise<void> {
 
     process.exit(0);
   };
+
+  simulator.onDisconnect(() => {
+    console.log("\nThe simulator closed the connection. Saving the pilot record and leaving.");
+    void stop();
+  });
 
   let lines: Promise<unknown> = Promise.resolve();
 
@@ -202,11 +312,11 @@ async function main(): Promise<void> {
       const { situation, engine } = session.state;
       const here = latest;
       const lines = [
-        `phase ${situation?.phase ?? "unknown"}, controller: ${engine.position ?? "single"}, ` +
-          `flight plan: ${engine.intake?.destination?.name ?? "none"}`,
+        `${airport.name} (${airport.icao}), phase ${situation?.phase ?? "unknown"}, ` +
+          `controller: ${engine.position ?? "single"}, flight plan: ${engine.intake?.destination?.name ?? "none"}`,
       ];
 
-      if (here && airport.taxi) {
+      if (airport.taxi) {
         const spot = nearestParking(airport.taxi, here);
 
         if (spot) {
@@ -217,8 +327,11 @@ async function main(): Promise<void> {
         const last = taxi?.pointIds[taxi.pointIds.length - 1];
 
         if (taxi && last !== undefined) {
-          const target = taxi.destination.kind === "runway" ? `runway ${taxi.destination.runway} hold line` : taxi.destination.name;
-          const legs = taxi.legs.map((leg) => (leg.kind === "taxiway" ? leg.name : `cross ${leg.runway}`)).join(", ");
+          const target =
+            taxi.destination.kind === "runway" ? `runway ${taxi.destination.runway} hold line` : taxi.destination.name;
+          const legs = taxi.legs
+            .map((leg) => (leg.kind === "taxiway" ? leg.name : `cross ${leg.runway}`))
+            .join(", ");
 
           lines.push(
             `taxiing to ${target}: ${Math.round(distanceToPointFeet(airport.taxi, last, here))} ft to go${legs ? ` via ${legs}` : ""}`,
@@ -238,7 +351,7 @@ async function main(): Promise<void> {
     const turn = await session.say(text);
 
     if (turn && !turn.transmission) {
-      show(`[${clock()}] ATC> (no response)\n${describe(turn)}`);
+      show(`[${stamp()}] ATC> (no response)\n${describe(turn)}`);
     }
   };
 
@@ -251,14 +364,8 @@ async function main(): Promise<void> {
   });
   process.once("SIGINT", () => void stop());
 
-  const tower = airport.frequencies?.find((f) => f.type === "tower");
-  const ground = airport.frequencies?.find((f) => f.type === "ground");
-
   console.log(
-    `Connected. ${airport.name} (${airport.icao}), runway ${runway.designator} active, callsign ${callsign}.\n` +
-      `Runways: ${airport.runways.map((r) => r.designator).join(", ")}. ` +
-      `Taxi network: ${airport.taxi ? `${airport.taxi.points.length} points` : "none"}. ` +
-      `Frequencies: ${tower ? `tower ${tower.frequencyMhz}` : "no tower"}${ground ? `, ground ${ground.frequencyMhz}` : ""}.${HELP}`,
+    `Connected. ${summarize(airport, activeRunwayFor(airport, aircraft), callsignFor(aircraft))}${HELP}`,
   );
 
   session.start();
