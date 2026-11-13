@@ -22,7 +22,7 @@ Implemented:
 - Two interactive CLIs (`npm run dev`, `npm run lab:chat`) and a behavioral
   benchmark harness (`npm run lab:benchmark`) — see below.
 
-Known gap: `src/index.ts` (the live MSFS path) currently sends an empty
+Known gap: `src/index.ts` (the old single-call MSFS path; `npm run live` is the real pipeline on MSFS) currently sends an empty
 `SingleCallContext.situationContext` and the placeholder `DEFAULT_FLIGHT_PLAN` —
 unlike `lab:chat`, which populates the context. The live app
 doesn't have real situational grounding yet.
@@ -124,6 +124,18 @@ doesn't have real situational grounding yet.
   (no Ollama, fixed clock): familiarity/strictness table, the remark rules
   through `decide`, record keeping, and a `JsonPilotRecordStore` round trip in
   a temp directory. Exits non-zero on any failure.
+- `npm run live` — build + run `src/live.ts`. The pipeline against the real
+  MSFS 2024: connects, takes the airport nearest the aircraft (or
+  `--airport <ICAO>`) from the sim's own facility data (`MsfsFacilityReader`),
+  guesses the active runway from the aircraft's heading (`--runway` overrides),
+  and runs `FlightSession` with stdin as the pilot's radio. Same flags as
+  `lab:play` where they apply (`--callsign`, `--intake`, `--records`); `/where`,
+  `/quit`. Needs MSFS and Ollama. Fixed at start: it does not switch airports
+  if you fly away, and the callsign is still the placeholder (`ATC ID` not read).
+- `npm run lab:probe` — build + run `src/lab/probe/run.js`. Prints live
+  telemetry once a second; `-- --airport` reads the nearest airport's facility
+  data and prints what was built from it (add `--segments` for the taxi graph in
+  runway coordinates). The tool for checking the sim-side assumptions.
 - `npm run build` / `npm start` — plain compile + run of `dist/index.js`.
 
 There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
@@ -398,8 +410,15 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
   geometry. `frequencyFacility.ts` does the same for `FREQUENCY` entries
   (`buildFrequencies`: type codes, Hz to MHz, deduplicated; types the engine
   has no use for are kept as "other"). `lab/taxi/facilityFixture.ts` is a fixture with each of those
-  traps in it. The still-missing half is reading the raw SimConnect buffers
-  into `RawAirportTaxiData`.
+  traps in it. `runwayFacility.ts` builds both ends of each RUNWAY strip (center +
+  heading + length) into `Runway`s; `parkingNames.ts` decodes the parking enums.
+  `MsfsFacilityReader.ts` is the SimConnect half: one facility definition (airport,
+  runways, frequencies, taxi points/parking/paths/names), the airport list for
+  "nearest airport", and a warning when an entry has bytes left over (a field of
+  a different size than assumed). RawBuffer decodes strings as Latin-1; the
+  reader re-decodes them as UTF-8. Pattern side defaults to left, pattern
+  altitude to 1000 ft and the airspace to 5 nm / 2500 ft: the facility data has
+  no source for them yet.
 - `src/ai/` — everything that talks to Ollama, one folder per pipeline stage:
   - Shared at the root:
     - `modelConfig.ts` — single source of truth for `MODEL` and `THINKING`.
@@ -537,30 +556,44 @@ There is no `ts-node`; everything runs compiled through `dist/`. **Top-level
       suffixes on collision).
     - `run.ts` — the runner.
 
-## Unverified against a real simulator
+## Checked against a real simulator
 
-Nothing has run against MSFS yet. These assumptions are built in and need
-checking on a sim machine (a wrong one fails quietly, not loudly):
+Telemetry and facility data were checked on MSFS 2024 at SADI (Chascomus, an
+uncontrolled field with no taxiway names) with `lab:probe` and `npm run live`:
 
-- Runway `HEADING` from facility data is true or magnetic (the geometry
-  assumes true).
-- `TAXI_POINT` `BIAS_X` is east and `BIAS_Z` is north, from the airport
-  reference point (`positionOf` in `taxiFacility.ts`).
-- `TAXI_PATH` type values: 1 taxi, 3 parking, 4 path are community-confirmed;
-  2 for runway is inferred (`PATH_TYPE`). Closed (5), vehicle (6), road (7)
-  and painted line (8) are excluded.
-- Parking paths: START is a taxi point and END is a parking index.
+- Confirmed: the SimVar telemetry, `COM ACTIVE FREQUENCY:1` (follows the radio),
+  runway `HEADING` is *true* (the aircraft sitting on the runway reported the
+  same heading to 0.01 degrees), `TAXI_POINT` `BIAS_X` east / `BIAS_Z` north,
+  runway-type `TAXI_PATH` is 2 (the paths run along the runway, so a route that
+  uses them reads as "cross runway"), the facility field layouts (no bytes left
+  over), the first end-to-end turn (lined up -> takeoff clearance).
+- Also at SABE (Aeroparque; 433 taxi points, taxiways A-M, 58 parking spots):
+  `TAXI_NAME`/`NAME_INDEX` give real taxiway names, parking enum 1 = "Parking"
+  and 10 = "Gate", frequency type codes 1 atis / 5 ground / 6 tower / 7 clearance
+  / 8 approach, hold lines get runway labels, and the runway is one chain of
+  runway-type paths. An airport can list *several* frequencies of one type
+  (SABE: three towers); a handoff names the first, and tuning any counts.
+- Runway designators are the sim's: SADI says 22/04 at a true heading of 195.
+
+## Still unverified against a real simulator
+
+These assumptions are built in and need checking on a sim machine (a wrong one
+fails quietly, not loudly). Most need a larger airport than SADI (named
+taxiways, a tower and ground frequency):
+
+- Parking enums other than 1 and 10 (`parkingNames.ts`).
+- Which of several tower frequencies is the one to name in a handoff.
+- Taxi and ground handoff behavior in the live app from a ramp spot (only run lined up on the runway so far).
+- Runway-type paths that run *along* the runway and extend past its ends
+  (SADI: ~850 ft each side): back-taxi routes through them are untested.
+- Parking paths (`TAXI_PATH` type 3): START is a taxi point and END is a parking index.
 - Hold lines have no runway in the data; the label comes from geometry
   (nearest runway end within 400 ft of a centerline).
-- Parking names (`TAXI_PARKING` `NAME` enum) still need decoding to strings.
 - `FREQUENCY` entries: the type codes (5 ground, 6 tower, ...) are documented,
   but some airports have no ground or tower entry, and some towers are marked
   as CTAF (a known navdata problem). With either missing the engine falls back
   to one controller. Approach/departure/center/ATIS frequencies are decoded but
   not used yet.
-- The tuned COM1 frequency SimVar (`COM ACTIVE FREQUENCY:1`, in MHz) is not
-  read yet; `AircraftState.com1FrequencyMhz` is optional and the engine only
-  uses it when present.
 - `ATC ID` returning the user aircraft's tail number; AI traffic fields;
   `PLANE TOUCHDOWN NORMAL VELOCITY`; wind and pressure SimVars.
 

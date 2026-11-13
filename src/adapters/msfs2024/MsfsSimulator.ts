@@ -13,6 +13,7 @@ const AIRCRAFT_STATE_REQUEST_ID = 0;
 
 export class MsfsSimulator implements SimulatorAdapter {
   private handle: Awaited<ReturnType<typeof open>>["handle"] | null = null;
+  private readonly subscribers: ((state: AircraftState) => void)[] = [];
 
   async connect(): Promise<void> {
     if (this.handle) {
@@ -35,8 +36,16 @@ export class MsfsSimulator implements SimulatorAdapter {
     this.handle = null;
   }
 
+  // The received buffer is read sequentially, so it is decoded once here and
+  // handed to every subscriber; reading it per subscriber would run off its end.
   onAircraftStateUpdate(callback: (state: AircraftState) => void): void {
     const handle = this.getHandle();
+
+    this.subscribers.push(callback);
+
+    if (this.subscribers.length > 1) {
+      return;
+    }
 
     handle.on("simObjectData", (received) => {
       if (received.requestID !== AIRCRAFT_STATE_REQUEST_ID) {
@@ -55,9 +64,12 @@ export class MsfsSimulator implements SimulatorAdapter {
         bank: data.readFloat64(),
         verticalSpeedFeetPerMinute: data.readFloat64(),
         isOnGround: data.readInt32() !== 0,
+        com1FrequencyMhz: data.readFloat64(),
       };
 
-      callback(state);
+      for (const subscriber of this.subscribers) {
+        subscriber(state);
+      }
     });
 
     handle.requestDataOnSimObject(
@@ -133,9 +145,16 @@ export class MsfsSimulator implements SimulatorAdapter {
       "Bool",
       SimConnectDataType.INT32,
     );
+
+    handle.addToDataDefinition(
+      AIRCRAFT_STATE_DEFINITION_ID,
+      "COM ACTIVE FREQUENCY:1",
+      "MHz",
+      SimConnectDataType.FLOAT64,
+    );
   }
 
-  private getHandle() {
+  getHandle() {
     if (!this.handle) {
       throw new Error("MSFS is not connected.");
     }

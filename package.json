@@ -11,6 +11,7 @@
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
     "dev": "npm run build && npm start",
+    "live": "npm run build && node dist/live.js",
     "lab:chat": "npm run build && node dist/lab/chat/run.js",
     "lab:benchmark": "npm run build && node dist/lab/benchmark/run.js",
     "lab:interpreter": "npm run build && node dist/lab/interpreter/run.js",
@@ -21,6 +22,7 @@
     "lab:intake": "npm run build && node dist/lab/intake/run.js",
     "lab:taxi": "npm run build && node dist/lab/taxi/run.js",
     "lab:memory": "npm run build && node dist/lab/memory/run.js",
+    "lab:probe": "npm run build && node dist/lab/probe/run.js",
     "lab:renderer": "npm run build && node dist/lab/renderer/run.js"
   },
   "dependencies": {

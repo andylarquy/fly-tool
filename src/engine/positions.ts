@@ -26,15 +26,18 @@ export const hasSeparatePositions = (airport: Airport): boolean =>
   frequencyFor(airport, "ground") !== undefined &&
   frequencyFor(airport, "tower") !== undefined;
 
+// An airport can list several frequencies of one type (SABE has three towers):
+// the first is the one spoken in a handoff, but tuning any of them counts.
 const positionOnRadio = (
   airport: Airport,
   frequencyMhz: number,
 ): ControllerPosition | undefined =>
-  (["ground", "tower"] as const).find((position) => {
-    const frequency = frequencyFor(airport, position);
-
-    return frequency !== undefined && Math.abs(frequency - frequencyMhz) < RADIO_TOLERANCE_MHZ;
-  });
+  (["ground", "tower"] as const).find((position) =>
+    airport.frequencies?.some(
+      (f) =>
+        f.type === TYPE_OF[position] && Math.abs(f.frequencyMhz - frequencyMhz) < RADIO_TOLERANCE_MHZ,
+    ),
+  );
 
 // Where the pilot starts: on the ramp or a taxiway the pilot is with ground;
 // at a hold line, on the runway, or in the air, with tower.

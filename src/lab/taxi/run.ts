@@ -732,6 +732,17 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    name: "Any of several tower frequencies counts as tower",
+    airport: {
+      ...labAirport,
+      frequencies: [...(labAirport.frequencies ?? []), { type: "tower", frequencyMhz: 125.5 }],
+    },
+    steps: [
+      { position: A.rampSpot, expect: [] },
+      { position: A.holdingShort, com1: 125.5, pilot: msg("request", "23", "hold_short"), expect: ["issue_clearance:line_up_and_wait"] },
+    ],
+  },
+  {
     name: "A frequency that belongs to nobody here changes nothing",
     airport: labAirport,
     steps: [

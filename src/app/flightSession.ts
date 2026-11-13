@@ -27,6 +27,7 @@ export interface FlightSessionOptions {
   runway?: string;
   runTurn?: typeof runPipelineTurn;
   onTransmission: (text: string, turn: PipelineTurn, pilotSpoke: boolean) => void;
+  onTurn?: (turn: PipelineTurn, pilotSpoke: boolean, aircraft: AircraftState) => void;
   onError?: (error: unknown) => void;
 }
 
@@ -131,6 +132,7 @@ export class FlightSession {
       );
 
       this.pipeline = turn.state;
+      options.onTurn?.(turn, transmission !== undefined, aircraft);
 
       if (turn.transmission) {
         options.onTransmission(turn.transmission, turn, transmission !== undefined);
